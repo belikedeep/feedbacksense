@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,9 @@ import {
   LineElement,
 } from 'chart.js'
 import { Bar, Pie, Line } from 'react-chartjs-2'
+import TimeRangeSelector from './TimeRangeSelector'
+import ExportPanel from './ExportPanel'
+import { format, isWithinInterval, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns'
 
 ChartJS.register(
   CategoryScale,
@@ -28,8 +31,45 @@ ChartJS.register(
 )
 
 export default function Analytics({ feedback }) {
+  const [selectedTimeRange, setSelectedTimeRange] = useState({
+    start: startOfDay(subDays(new Date(), 29)),
+    end: endOfDay(new Date()),
+    rangeId: 'last30days'
+  })
+  const [showExportPanel, setShowExportPanel] = useState(false)
+
+  // Filter feedback by selected time range
+  const filteredFeedback = useMemo(() => {
+    if (!selectedTimeRange.start || !selectedTimeRange.end) return feedback
+
+    return feedback.filter(item => {
+      const feedbackDate = new Date(item.feedbackDate || item.feedback_date)
+      return isWithinInterval(feedbackDate, {
+        start: selectedTimeRange.start,
+        end: selectedTimeRange.end
+      })
+    })
+  }, [feedback, selectedTimeRange])
+
+  // Calculate previous period data for comparison
+  const previousPeriodData = useMemo(() => {
+    if (!selectedTimeRange.start || !selectedTimeRange.end) return []
+
+    const rangeDuration = selectedTimeRange.end - selectedTimeRange.start
+    const previousStart = new Date(selectedTimeRange.start.getTime() - rangeDuration)
+    const previousEnd = new Date(selectedTimeRange.end.getTime() - rangeDuration)
+
+    return feedback.filter(item => {
+      const feedbackDate = new Date(item.feedbackDate || item.feedback_date)
+      return isWithinInterval(feedbackDate, {
+        start: previousStart,
+        end: previousEnd
+      })
+    })
+  }, [feedback, selectedTimeRange])
+
   const analytics = useMemo(() => {
-    if (!feedback || feedback.length === 0) {
+    if (!filteredFeedback || filteredFeedback.length === 0) {
       return {
         totalFeedback: 0,
         sentimentDistribution: { positive: 0, negative: 0, neutral: 0 },
@@ -41,61 +81,66 @@ export default function Analytics({ feedback }) {
     }
 
     // Basic metrics
-    const totalFeedback = feedback.length
+    const totalFeedback = filteredFeedback.length
     const averageSentiment = totalFeedback > 0
-      ? feedback.reduce((sum, f) => {
+      ? filteredFeedback.reduce((sum, f) => {
           const score = parseFloat(f.sentimentScore || f.sentiment_score || 0)
           return sum + score
         }, 0) / totalFeedback
       : 0
 
     // Sentiment distribution
-    const sentimentDistribution = feedback.reduce((acc, f) => {
+    const sentimentDistribution = filteredFeedback.reduce((acc, f) => {
       const label = f.sentimentLabel || f.sentiment_label || 'neutral'
       acc[label] = (acc[label] || 0) + 1
       return acc
     }, {})
 
     // Category distribution
-    const categoryDistribution = feedback.reduce((acc, f) => {
+    const categoryDistribution = filteredFeedback.reduce((acc, f) => {
       acc[f.category] = (acc[f.category] || 0) + 1
       return acc
     }, {})
 
     // Source distribution
-    const sourceDistribution = feedback.reduce((acc, f) => {
+    const sourceDistribution = filteredFeedback.reduce((acc, f) => {
       acc[f.source] = (acc[f.source] || 0) + 1
       return acc
     }, {})
 
-    // Recent trend (last 7 days)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      return date.toISOString().split('T')[0]
-    }).reverse()
+    // Generate trend data based on selected time range
+    const generateTrendData = (startDate, endDate, data) => {
+      const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1
+      const trendData = []
 
-    const recentTrend = last7Days.map(date => {
-      const dayFeedback = feedback.filter(f => {
-        const feedbackDate = f.feedbackDate || f.feedback_date
-        if (!feedbackDate) return false
-        
-        // Handle both string and Date object formats
-        const dateStr = typeof feedbackDate === 'string'
-          ? feedbackDate
-          : feedbackDate.toISOString ? feedbackDate.toISOString().split('T')[0]
-          : String(feedbackDate).split('T')[0]
-        
-        return dateStr === date
-      })
-      
-      return {
-        date,
-        count: dayFeedback.length,
-        sentiment: dayFeedback.length > 0 ?
-          dayFeedback.reduce((sum, f) => sum + parseFloat(f.sentimentScore || f.sentiment_score || 0), 0) / dayFeedback.length : 0
+      for (let i = 0; i < days; i++) {
+        const date = new Date(startDate)
+        date.setDate(date.getDate() + i)
+        const dateStr = date.toISOString().split('T')[0]
+
+        const dayFeedback = data.filter(f => {
+          const feedbackDate = f.feedbackDate || f.feedback_date
+          if (!feedbackDate) return false
+          
+          const feedbackDateStr = typeof feedbackDate === 'string'
+            ? feedbackDate.split('T')[0]
+            : new Date(feedbackDate).toISOString().split('T')[0]
+          
+          return feedbackDateStr === dateStr
+        })
+
+        trendData.push({
+          date: dateStr,
+          count: dayFeedback.length,
+          sentiment: dayFeedback.length > 0 ?
+            dayFeedback.reduce((sum, f) => sum + parseFloat(f.sentimentScore || f.sentiment_score || 0), 0) / dayFeedback.length : 0
+        })
       }
-    })
+
+      return trendData
+    }
+
+    const recentTrend = generateTrendData(selectedTimeRange.start, selectedTimeRange.end, filteredFeedback)
 
     return {
       totalFeedback,
@@ -103,9 +148,42 @@ export default function Analytics({ feedback }) {
       categoryDistribution,
       sourceDistribution,
       recentTrend,
-      averageSentiment
+      averageSentiment,
+      previousPeriodData,
+      selectedTimeRange
     }
-  }, [feedback])
+  }, [filteredFeedback, previousPeriodData, selectedTimeRange])
+
+  // Calculate period-over-period comparison
+  const periodComparison = useMemo(() => {
+    const currentTotal = analytics.totalFeedback
+    const previousTotal = previousPeriodData.length
+    
+    const currentPositive = analytics.sentimentDistribution.positive || 0
+    const previousPositive = previousPeriodData.filter(f =>
+      (f.sentimentLabel || f.sentiment_label) === 'positive'
+    ).length
+    
+    const currentAvgSentiment = analytics.averageSentiment
+    const previousAvgSentiment = previousTotal > 0 ?
+      previousPeriodData.reduce((sum, f) => sum + parseFloat(f.sentimentScore || f.sentiment_score || 0), 0) / previousTotal : 0
+
+    const calculateChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return ((current - previous) / previous) * 100
+    }
+
+    return {
+      totalChange: calculateChange(currentTotal, previousTotal),
+      positiveChange: calculateChange(currentPositive, previousPositive),
+      sentimentChange: calculateChange(currentAvgSentiment, previousAvgSentiment),
+      hasPreviousData: previousTotal > 0
+    }
+  }, [analytics, previousPeriodData])
+
+  const handleTimeRangeChange = (start, end, rangeId) => {
+    setSelectedTimeRange({ start, end, rangeId })
+  }
 
   const sentimentChartData = {
     labels: Object.keys(analytics.sentimentDistribution),
@@ -157,6 +235,17 @@ export default function Analytics({ feedback }) {
     },
   }
 
+  const formatChange = (change) => {
+    const sign = change > 0 ? '+' : ''
+    return `${sign}${change.toFixed(1)}%`
+  }
+
+  const getChangeColor = (change) => {
+    if (change > 0) return 'text-green-600'
+    if (change < 0) return 'text-red-600'
+    return 'text-gray-600'
+  }
+
   if (feedback.length === 0) {
     return (
       <div className="text-center py-12">
@@ -168,8 +257,36 @@ export default function Analytics({ feedback }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard Analytics</h2>
-      
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Dashboard Analytics</h2>
+        <button
+          onClick={() => setShowExportPanel(!showExportPanel)}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export Data
+        </button>
+      </div>
+
+      {/* Time Range Selector */}
+      <TimeRangeSelector
+        onRangeChange={handleTimeRangeChange}
+        initialRange={selectedTimeRange.rangeId}
+      />
+
+      {/* Export Panel */}
+      {showExportPanel && (
+        <div className="mb-6">
+          <ExportPanel
+            feedback={feedback}
+            analytics={analytics}
+            filteredFeedback={filteredFeedback}
+          />
+        </div>
+      )}
+
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow border">
@@ -182,7 +299,14 @@ export default function Analytics({ feedback }) {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">Total Feedback</dt>
-                <dd className="text-lg font-medium text-gray-900">{analytics.totalFeedback}</dd>
+                <dd className="flex items-center space-x-2">
+                  <span className="text-lg font-medium text-gray-900">{analytics.totalFeedback}</span>
+                  {periodComparison.hasPreviousData && (
+                    <span className={`text-sm ${getChangeColor(periodComparison.totalChange)}`}>
+                      {formatChange(periodComparison.totalChange)}
+                    </span>
+                  )}
+                </dd>
               </dl>
             </div>
           </div>
@@ -198,7 +322,14 @@ export default function Analytics({ feedback }) {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">Positive</dt>
-                <dd className="text-lg font-medium text-gray-900">{analytics.sentimentDistribution.positive || 0}</dd>
+                <dd className="flex items-center space-x-2">
+                  <span className="text-lg font-medium text-gray-900">{analytics.sentimentDistribution.positive || 0}</span>
+                  {periodComparison.hasPreviousData && (
+                    <span className={`text-sm ${getChangeColor(periodComparison.positiveChange)}`}>
+                      {formatChange(periodComparison.positiveChange)}
+                    </span>
+                  )}
+                </dd>
               </dl>
             </div>
           </div>
@@ -230,7 +361,16 @@ export default function Analytics({ feedback }) {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">Avg Sentiment</dt>
-                <dd className="text-lg font-medium text-gray-900">{isNaN(analytics.averageSentiment) ? '0.0' : (analytics.averageSentiment * 100).toFixed(1)}%</dd>
+                <dd className="flex items-center space-x-2">
+                  <span className="text-lg font-medium text-gray-900">
+                    {isNaN(analytics.averageSentiment) ? '0.0' : (analytics.averageSentiment * 100).toFixed(1)}%
+                  </span>
+                  {periodComparison.hasPreviousData && (
+                    <span className={`text-sm ${getChangeColor(periodComparison.sentimentChange)}`}>
+                      {formatChange(periodComparison.sentimentChange)}
+                    </span>
+                  )}
+                </dd>
               </dl>
             </div>
           </div>
@@ -242,7 +382,7 @@ export default function Analytics({ feedback }) {
         {/* Sentiment Distribution */}
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Sentiment Distribution</h3>
-          <div className="h-64">
+          <div className="h-64" data-chart-export data-chart-title="Sentiment Distribution">
             <Pie data={sentimentChartData} options={chartOptions} />
           </div>
         </div>
@@ -250,7 +390,7 @@ export default function Analytics({ feedback }) {
         {/* Category Breakdown */}
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Feedback by Category</h3>
-          <div className="h-64">
+          <div className="h-64" data-chart-export data-chart-title="Feedback by Category">
             <Bar data={categoryChartData} options={chartOptions} />
           </div>
         </div>
@@ -258,8 +398,11 @@ export default function Analytics({ feedback }) {
 
       {/* Trend Chart */}
       <div className="bg-white p-6 rounded-lg shadow border mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Feedback Trend (Last 7 Days)</h3>
-        <div className="h-64">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Feedback Trend ({selectedTimeRange.rangeId === 'custom' ? 'Custom Range' :
+            selectedTimeRange.rangeId.replace('last', 'Last ').replace('days', ' Days').replace('months', ' Months').replace('1year', '1 Year')})
+        </h3>
+        <div className="h-64" data-chart-export data-chart-title="Feedback Trend">
           <Line data={trendChartData} options={chartOptions} />
         </div>
       </div>
@@ -284,6 +427,31 @@ export default function Analytics({ feedback }) {
           ))}
         </div>
       </div>
+
+      {/* Period Comparison Summary */}
+      {periodComparison.hasPreviousData && (
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Period-over-Period Comparison</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{formatChange(periodComparison.totalChange)}</div>
+              <div className="text-sm text-gray-500">Total Feedback</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{formatChange(periodComparison.positiveChange)}</div>
+              <div className="text-sm text-gray-500">Positive Feedback</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{formatChange(periodComparison.sentimentChange)}</div>
+              <div className="text-sm text-gray-500">Avg Sentiment</div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-4 text-center">
+            Compared to previous {selectedTimeRange.rangeId === 'custom' ? 'period' :
+              selectedTimeRange.rangeId.replace('last', '').replace('days', ' days').replace('months', ' months').replace('1year', ' year')}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

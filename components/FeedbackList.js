@@ -2,18 +2,19 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import AdvancedSearchPanel from './AdvancedSearchPanel'
 
 export default function FeedbackList({ feedback, onUpdate }) {
-  const [filter, setFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [sentimentFilter, setSentimentFilter] = useState('')
+  const [filteredFeedback, setFilteredFeedback] = useState(feedback)
+  const [currentFilters, setCurrentFilters] = useState({})
 
-  const filteredFeedback = feedback.filter(item => {
-    const matchesText = item.content.toLowerCase().includes(filter.toLowerCase())
-    const matchesCategory = !categoryFilter || item.category === categoryFilter
-    const matchesSentiment = !sentimentFilter || (item.sentimentLabel || item.sentiment_label) === sentimentFilter
-    return matchesText && matchesCategory && matchesSentiment
-  })
+  const handleFilteredResults = (results) => {
+    setFilteredFeedback(results)
+  }
+
+  const handleFiltersChange = (filters) => {
+    setCurrentFilters(filters)
+  }
 
   const getSentimentColor = (sentiment) => {
     switch (sentiment) {
@@ -44,55 +45,29 @@ export default function FeedbackList({ feedback, onUpdate }) {
     }
   }
 
-  const categories = [...new Set(feedback.map(f => f.category))]
-  const sentiments = [...new Set(feedback.map(f => f.sentimentLabel || f.sentiment_label))]
+  // Highlight search terms in content
+  const highlightSearchTerms = (content, searchQuery) => {
+    if (!searchQuery || !content) return content
+
+    // Simple highlighting for now - can be enhanced for advanced search
+    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    return content.split(regex).map((part, index) =>
+      regex.test(part) ?
+        <mark key={index} className="bg-yellow-200 px-1 rounded">{part}</mark> :
+        part
+    )
+  }
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-6">All Feedback</h2>
       
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div>
-          <input
-            type="text"
-            placeholder="Search feedback..."
-            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
-        
-        <div>
-          <select
-            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div>
-          <select
-            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            value={sentimentFilter}
-            onChange={(e) => setSentimentFilter(e.target.value)}
-          >
-            <option value="">All Sentiments</option>
-            {sentiments.map(sent => (
-              <option key={sent} value={sent}>{sent}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="text-sm text-gray-500 flex items-center">
-          Showing {filteredFeedback.length} of {feedback.length} items
-        </div>
-      </div>
+      {/* Advanced Search Panel */}
+      <AdvancedSearchPanel
+        feedback={feedback}
+        onFilteredResults={handleFilteredResults}
+        onFiltersChange={handleFiltersChange}
+      />
 
       {/* Feedback List */}
       <div className="space-y-4">
@@ -129,7 +104,9 @@ export default function FeedbackList({ feedback, onUpdate }) {
                 </div>
               </div>
               
-              <p className="text-gray-900 mb-3">{item.content}</p>
+              <p className="text-gray-900 mb-3">
+                {highlightSearchTerms(item.content, currentFilters.searchQuery)}
+              </p>
               
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div>
