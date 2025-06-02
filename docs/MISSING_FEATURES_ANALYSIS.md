@@ -125,6 +125,24 @@
   - Customer satisfaction surveys
 
 ### 7. **Advanced AI Features**
+- [ ] **AI-Powered Categorization** 🤖
+  - **Gemini AI Integration** for intelligent feedback classification
+  - **Automatic categorization** into predefined categories:
+    - Feature requests
+    - Bug reports
+    - Shipping complaints
+    - Product quality issues
+    - Customer service feedback
+    - General inquiries
+    - Refund requests
+    - Compliments/praise
+  - **Custom category creation** with AI training
+  - **Confidence scoring** for each categorization
+  - **Manual override** for incorrect classifications
+  - **Bulk re-categorization** with improved AI models
+  - **Category-based analytics** and reporting
+  - **Auto-routing** feedback to appropriate teams based on category
+
 - [ ] **Enhanced NLP**
   - Topic modeling and extraction
   - Emotion detection (anger, joy, sadness, etc.)
@@ -216,12 +234,13 @@
 6. ⏳ Stripe payment integration
 
 ### **Phase 2: Important (Should Have) ⚡**
-1. Custom categories management
-2. Edit feedback functionality
-3. Email notifications
-4. Team collaboration features
-5. Enhanced sentiment analysis
-6. API development
+1. **AI-Powered Categorization** (Gemini AI integration) 🤖
+2. Custom categories management
+3. Edit feedback functionality
+4. Email notifications
+5. Team collaboration features
+6. Enhanced sentiment analysis
+7. API development
 
 ### **Phase 3: Nice to Have (Could Have) ✨**
 1. Mobile app
