@@ -11,15 +11,19 @@ datasource db {
 }
 
 model Profile {
-  id        String   @id @db.Uuid
-  email     String?
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id         String   @id @db.Uuid
+  email      String?
+  name       String?
+  phone      String?
+  preferences Json?   @default("{}")
+  timezone   String?  @default("UTC")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  feedback   Feedback[]
-  categories Category[]
+  feedback     Feedback[]
+  categories   Category[]
+  activityLogs ActivityLog[]
 
   @@map("profiles")
 }
@@ -61,4 +65,21 @@ model Category {
   user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("categories")
+}
+
+model ActivityLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
