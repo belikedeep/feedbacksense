@@ -7,7 +7,7 @@ import CSVImport from './CSVImport'
 import FeedbackList from './FeedbackList'
 import Analytics from './Analytics'
 
-export default function Dashboard({ user }) {
+export default function Dashboard({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
@@ -60,7 +60,11 @@ export default function Dashboard({ user }) {
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    if (onSignOut) {
+      onSignOut()
+    } else {
+      await supabase.auth.signOut()
+    }
   }
 
   const addFeedback = (newFeedback) => {
@@ -69,6 +73,35 @@ export default function Dashboard({ user }) {
 
   const addBulkFeedback = (newFeedbacks) => {
     setFeedback([...newFeedbacks, ...feedback])
+  }
+
+  const reanalyzeAllFeedback = async () => {
+    if (!confirm('This will re-analyze all your feedback with improved sentiment analysis. Continue?')) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch('/api/feedback/reanalyze', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert(`Success! Re-analyzed ${result.count} feedback entries.`)
+        // Refresh feedback data
+        fetchFeedback()
+      } else {
+        throw new Error('Failed to re-analyze feedback')
+      }
+    } catch (error) {
+      alert('Error: ' + error.message)
+    }
   }
 
   return (
@@ -81,7 +114,7 @@ export default function Dashboard({ user }) {
               <h1 className="text-3xl font-bold text-gray-900">FeedbackSense</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">Welcome, {user.email}</span>
+              <span className="text-sm text-gray-500">Welcome, {user?.email || 'User'}</span>
               <button
                 onClick={handleSignOut}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -95,26 +128,37 @@ export default function Dashboard({ user }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
-        <nav className="flex space-x-8 mb-8">
-          {[
-            { id: 'dashboard', label: 'Dashboard' },
-            { id: 'add-feedback', label: 'Add Feedback' },
-            { id: 'import-csv', label: 'Import CSV' },
-            { id: 'feedback-list', label: 'All Feedback' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-4 text-sm font-medium rounded-md ${
-                activeTab === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+        <div className="flex justify-between items-center mb-8">
+          <nav className="flex space-x-8">
+            {[
+              { id: 'dashboard', label: 'Dashboard' },
+              { id: 'add-feedback', label: 'Add Feedback' },
+              { id: 'import-csv', label: 'Import CSV' },
+              { id: 'feedback-list', label: 'All Feedback' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-2 px-4 text-sm font-medium rounded-md ${
+                  activeTab === tab.id
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+          
+          {/* Re-analyze button */}
+          <button
+            onClick={reanalyzeAllFeedback}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+            title="Re-analyze all feedback with improved sentiment analysis"
+          >
+            🔄 Fix Sentiment Scores
+          </button>
+        </div>
 
         {/* Content */}
         <div className="bg-white rounded-lg shadow p-6">

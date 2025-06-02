@@ -42,7 +42,12 @@ export default function Analytics({ feedback }) {
 
     // Basic metrics
     const totalFeedback = feedback.length
-    const averageSentiment = feedback.reduce((sum, f) => sum + (f.sentimentScore || f.sentiment_score || 0), 0) / totalFeedback
+    const averageSentiment = totalFeedback > 0
+      ? feedback.reduce((sum, f) => {
+          const score = parseFloat(f.sentimentScore || f.sentiment_score || 0)
+          return sum + score
+        }, 0) / totalFeedback
+      : 0
 
     // Sentiment distribution
     const sentimentDistribution = feedback.reduce((acc, f) => {
@@ -88,7 +93,7 @@ export default function Analytics({ feedback }) {
         date,
         count: dayFeedback.length,
         sentiment: dayFeedback.length > 0 ?
-          dayFeedback.reduce((sum, f) => sum + (f.sentimentScore || f.sentiment_score || 0), 0) / dayFeedback.length : 0
+          dayFeedback.reduce((sum, f) => sum + parseFloat(f.sentimentScore || f.sentiment_score || 0), 0) / dayFeedback.length : 0
       }
     })
 
@@ -225,7 +230,7 @@ export default function Analytics({ feedback }) {
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">Avg Sentiment</dt>
-                <dd className="text-lg font-medium text-gray-900">{(analytics.averageSentiment * 100).toFixed(1)}%</dd>
+                <dd className="text-lg font-medium text-gray-900">{isNaN(analytics.averageSentiment) ? '0.0' : (analytics.averageSentiment * 100).toFixed(1)}%</dd>
               </dl>
             </div>
           </div>
