@@ -11,7 +11,7 @@ export default function FeedbackList({ feedback, onUpdate }) {
   const filteredFeedback = feedback.filter(item => {
     const matchesText = item.content.toLowerCase().includes(filter.toLowerCase())
     const matchesCategory = !categoryFilter || item.category === categoryFilter
-    const matchesSentiment = !sentimentFilter || item.sentiment_label === sentimentFilter
+    const matchesSentiment = !sentimentFilter || (item.sentimentLabel || item.sentiment_label) === sentimentFilter
     return matchesText && matchesCategory && matchesSentiment
   })
 
@@ -45,7 +45,7 @@ export default function FeedbackList({ feedback, onUpdate }) {
   }
 
   const categories = [...new Set(feedback.map(f => f.category))]
-  const sentiments = [...new Set(feedback.map(f => f.sentiment_label))]
+  const sentiments = [...new Set(feedback.map(f => f.sentimentLabel || f.sentiment_label))]
 
   return (
     <div>
@@ -105,15 +105,20 @@ export default function FeedbackList({ feedback, onUpdate }) {
             <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-3">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentColor(item.sentiment_label)}`}>
-                    {item.sentiment_label}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentColor(item.sentimentLabel || item.sentiment_label)}`}>
+                    {item.sentimentLabel || item.sentiment_label}
                   </span>
                   <span className="text-sm text-gray-500">{item.category}</span>
                   <span className="text-sm text-gray-500">{item.source}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-500">
-                    {new Date(item.feedback_date).toLocaleDateString()}
+                    {(() => {
+                      const date = item.feedbackDate || item.feedback_date
+                      if (!date) return 'No date'
+                      const dateObj = new Date(date)
+                      return isNaN(dateObj.getTime()) ? 'Invalid date' : dateObj.toLocaleDateString()
+                    })()}
                   </span>
                   <button
                     onClick={() => deleteFeedback(item.id)}
@@ -128,7 +133,7 @@ export default function FeedbackList({ feedback, onUpdate }) {
               
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div>
-                  Sentiment Score: {(item.sentiment_score * 100).toFixed(1)}%
+                  Sentiment Score: {(parseFloat(item.sentimentScore || item.sentiment_score || 0) * 100).toFixed(1)}%
                 </div>
                 {item.topics && item.topics.length > 0 && (
                   <div>
