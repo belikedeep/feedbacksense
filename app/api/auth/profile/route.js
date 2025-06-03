@@ -70,7 +70,21 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    const body = await request.json()
+    // Safely parse JSON with error handling
+    let body = {}
+    try {
+      const contentType = request.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        const text = await request.text()
+        if (text.trim()) {
+          body = JSON.parse(text)
+        }
+      }
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError)
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 })
+    }
+    
     const { name, phone, preferences, timezone } = body
 
     // Update or create profile

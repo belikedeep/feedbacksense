@@ -23,20 +23,49 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Get feedback for the authenticated user
-    const feedback = await prisma.feedback.findMany({
-      where: {
-        userId: user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
+    // Get feedback for the authenticated user with retry logic
+    let feedback
+    let retryCount = 0
+    const maxRetries = 3
+    
+    while (retryCount < maxRetries) {
+      try {
+        feedback = await prisma.feedback.findMany({
+          where: {
+            userId: user.id
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        })
+        break
+      } catch (dbError) {
+        retryCount++
+        console.error(`Database error (attempt ${retryCount}):`, dbError)
+        
+        if (retryCount >= maxRetries) {
+          // Check if it's a connection error
+          if (dbError.code === 'P1001' || dbError.message?.includes("Can't reach database server")) {
+            return NextResponse.json({
+              error: 'Database connection failed. Please check your database connection and try again.',
+              details: 'Unable to connect to database server'
+            }, { status: 503 })
+          }
+          throw dbError
+        }
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000))
       }
-    })
+    }
 
-    return NextResponse.json(feedback)
+    return NextResponse.json(feedback || [])
   } catch (error) {
     console.error('Error fetching feedback:', error)
-    return NextResponse.json({ error: 'Failed to fetch feedback' }, { status: 500 })
+    return NextResponse.json({
+      error: 'Failed to fetch feedback',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 })
   }
 }
 
@@ -56,20 +85,56 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    const body = await request.json()
+    // Safely parse JSON with error handling
+    let body = {}
+    try {
+      const contentType = request.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        const text = await request.text()
+        if (text.trim()) {
+          body = JSON.parse(text)
+        }
+      }
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError)
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 })
+    }
+
     const { content, source, category, sentimentScore, sentimentLabel, topics, feedbackDate } = body
+
+    // Validate required fields
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return NextResponse.json({ error: 'Content is required' }, { status: 400 })
+    }
 
     // Ensure user profile exists with retry logic
     let existingProfile
-    try {
-      existingProfile = await prisma.profile.findUnique({
-        where: { id: user.id }
-      })
-    } catch (dbError) {
-      console.error('Database connection error:', dbError)
-      return NextResponse.json({
-        error: 'Database connection failed. Please try again in a moment.'
-      }, { status: 503 })
+    let retryCount = 0
+    const maxRetries = 3
+    
+    while (retryCount < maxRetries) {
+      try {
+        existingProfile = await prisma.profile.findUnique({
+          where: { id: user.id }
+        })
+        break
+      } catch (dbError) {
+        retryCount++
+        console.error(`Database error checking profile (attempt ${retryCount}):`, dbError)
+        
+        if (retryCount >= maxRetries) {
+          if (dbError.code === 'P1001' || dbError.message?.includes("Can't reach database server")) {
+            return NextResponse.json({
+              error: 'Database connection failed. Please check your database connection and try again.',
+              details: 'Unable to connect to database server'
+            }, { status: 503 })
+          }
+          throw dbError
+        }
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000))
+      }
     }
 
     if (!existingProfile) {
@@ -79,30 +144,57 @@ export async function POST(request) {
           data: {
             id: user.id,
             email: user.email,
-            name: user.user_metadata?.name || user.email
+            name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            preferences: {},
+            timezone: 'UTC'
           }
         })
       } catch (profileError) {
         console.error('Error creating profile:', profileError)
         return NextResponse.json({
-          error: 'Failed to create user profile. Please try again.'
+          error: 'Failed to create user profile. Please try again.',
+          details: process.env.NODE_ENV === 'development' ? profileError.message : undefined
         }, { status: 500 })
       }
     }
 
-    // Create new feedback
-    const newFeedback = await prisma.feedback.create({
-      data: {
-        userId: user.id,
-        content,
-        source: source || 'manual',
-        category: category || 'general',
-        sentimentScore: sentimentScore || 0.5,
-        sentimentLabel: sentimentLabel || 'neutral',
-        topics: topics || [],
-        feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date()
+    // Create new feedback with retry logic
+    let newFeedback
+    retryCount = 0
+    
+    while (retryCount < maxRetries) {
+      try {
+        newFeedback = await prisma.feedback.create({
+          data: {
+            userId: user.id,
+            content: content.trim(),
+            source: source || 'manual',
+            category: category || 'general',
+            sentimentScore: sentimentScore || 0.5,
+            sentimentLabel: sentimentLabel || 'neutral',
+            topics: topics || [],
+            feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date()
+          }
+        })
+        break
+      } catch (dbError) {
+        retryCount++
+        console.error(`Database error creating feedback (attempt ${retryCount}):`, dbError)
+        
+        if (retryCount >= maxRetries) {
+          if (dbError.code === 'P1001' || dbError.message?.includes("Can't reach database server")) {
+            return NextResponse.json({
+              error: 'Database connection failed. Please check your database connection and try again.',
+              details: 'Unable to connect to database server'
+            }, { status: 503 })
+          }
+          throw dbError
+        }
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000))
       }
-    })
+    }
 
     return NextResponse.json(newFeedback)
   } catch (error) {
