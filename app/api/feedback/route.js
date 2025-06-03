@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
+import { analyzeAndCategorizeFeedback } from '@/lib/sentimentAnalysis'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -107,6 +108,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
 
+    // Perform AI-powered analysis
+    let analysisResult = null
+    try {
+      analysisResult = await analyzeAndCategorizeFeedback(content.trim())
+    } catch (analysisError) {
+      console.error('AI analysis failed, proceeding with manual categorization:', analysisError)
+      // Continue with manual categorization - don't block user flow
+    }
+
     // Ensure user profile exists with retry logic
     let existingProfile
     let retryCount = 0
@@ -162,19 +172,40 @@ export async function POST(request) {
     let newFeedback
     retryCount = 0
     
+    // Prepare feedback data with AI analysis results or fallback values
+    const feedbackData = {
+      userId: user.id,
+      content: content.trim(),
+      source: source || 'manual',
+      feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date()
+    }
+
+    if (analysisResult) {
+      // Use AI analysis results
+      feedbackData.category = category || analysisResult.aiCategory || 'general'
+      feedbackData.sentimentScore = analysisResult.sentimentScore || 0.5
+      feedbackData.sentimentLabel = analysisResult.sentimentLabel || 'neutral'
+      feedbackData.topics = analysisResult.topics || []
+      feedbackData.aiCategoryConfidence = analysisResult.aiCategoryConfidence || null
+      feedbackData.aiClassificationMeta = analysisResult.classificationMeta || null
+      feedbackData.classificationHistory = [analysisResult.historyEntry] || []
+      feedbackData.manualOverride = category ? true : false // Set to true if category was manually provided
+    } else {
+      // Fallback to manual/existing values
+      feedbackData.category = category || 'general'
+      feedbackData.sentimentScore = sentimentScore || 0.5
+      feedbackData.sentimentLabel = sentimentLabel || 'neutral'
+      feedbackData.topics = topics || []
+      feedbackData.aiCategoryConfidence = null
+      feedbackData.aiClassificationMeta = null
+      feedbackData.classificationHistory = []
+      feedbackData.manualOverride = category ? true : false
+    }
+    
     while (retryCount < maxRetries) {
       try {
         newFeedback = await prisma.feedback.create({
-          data: {
-            userId: user.id,
-            content: content.trim(),
-            source: source || 'manual',
-            category: category || 'general',
-            sentimentScore: sentimentScore || 0.5,
-            sentimentLabel: sentimentLabel || 'neutral',
-            topics: topics || [],
-            feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date()
-          }
+          data: feedbackData
         })
         break
       } catch (dbError) {

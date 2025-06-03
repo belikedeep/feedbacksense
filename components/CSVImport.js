@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { analyzeSentiment } from '@/lib/sentimentAnalysis'
+import { analyzeAndCategorizeFeedback } from '@/lib/sentimentAnalysis'
 import Papa from 'papaparse'
 
 export default function CSVImport({ onFeedbackImported }) {
@@ -53,25 +53,66 @@ export default function CSVImport({ onFeedbackImported }) {
         header: true,
         complete: async (results) => {
           const feedbacks = []
+          let processed = 0
+          const total = results.data.filter(row => row[columnMapping.content] && row[columnMapping.content].trim()).length
+          
+          setMessage(`Processing ${total} feedback entries with AI analysis...`)
           
           for (const row of results.data) {
             if (row[columnMapping.content] && row[columnMapping.content].trim()) {
               const content = row[columnMapping.content].trim()
-              const sentimentResult = await analyzeSentiment(content)
               
-              feedbacks.push({
-                content,
-                source: row[columnMapping.source] || 'csv_import',
-                category: row[columnMapping.category] || 'general',
-                sentimentScore: sentimentResult.score,
-                sentimentLabel: sentimentResult.label,
-                feedbackDate: row[columnMapping.date] || new Date().toISOString(),
-                topics: sentimentResult.topics || []
-              })
+              try {
+                // Use AI categorization for CSV imports
+                const analysisResult = await analyzeAndCategorizeFeedback(content)
+                
+                feedbacks.push({
+                  content,
+                  source: row[columnMapping.source] || 'csv_import',
+                  category: row[columnMapping.category] || analysisResult.aiCategory,
+                  sentimentScore: analysisResult.sentimentScore,
+                  sentimentLabel: analysisResult.sentimentLabel,
+                  feedbackDate: row[columnMapping.date] || new Date().toISOString(),
+                  topics: analysisResult.topics || [],
+                  // Include AI analysis data
+                  aiCategoryConfidence: analysisResult.aiCategoryConfidence,
+                  aiClassificationMeta: analysisResult.classificationMeta,
+                  classificationHistory: [analysisResult.historyEntry],
+                  manualOverride: row[columnMapping.category] ? true : false // True if CSV had a category
+                })
+                
+                processed++
+                setMessage(`Processing ${processed}/${total} feedback entries with AI analysis...`)
+                
+                // Small delay to respect rate limits
+                if (processed % 5 === 0) {
+                  await new Promise(resolve => setTimeout(resolve, 1000))
+                }
+                
+              } catch (analysisError) {
+                console.error('AI analysis failed for row:', analysisError)
+                // Fallback to basic categorization
+                feedbacks.push({
+                  content,
+                  source: row[columnMapping.source] || 'csv_import',
+                  category: row[columnMapping.category] || 'general_inquiry',
+                  sentimentScore: 0.5,
+                  sentimentLabel: 'neutral',
+                  feedbackDate: row[columnMapping.date] || new Date().toISOString(),
+                  topics: [],
+                  aiCategoryConfidence: null,
+                  aiClassificationMeta: null,
+                  classificationHistory: [],
+                  manualOverride: row[columnMapping.category] ? true : false
+                })
+                processed++
+              }
             }
           }
 
           if (feedbacks.length > 0) {
+            setMessage(`Saving ${feedbacks.length} analyzed feedback entries to database...`)
+            
             const response = await fetch('/api/feedback/bulk', {
               method: 'POST',
               headers: {
@@ -84,7 +125,7 @@ export default function CSVImport({ onFeedbackImported }) {
             if (!response.ok) throw new Error('Failed to import feedback')
             const result = await response.json()
 
-            setMessage(`Successfully imported ${result.count} feedback entries!`)
+            setMessage(`🎉 Successfully imported ${result.count} feedback entries with AI categorization! ${result.aiAnalyzed || 0} entries were analyzed with AI.`)
             onFeedbackImported(result.feedbacks)
             setFile(null)
             setPreview(null)
@@ -244,7 +285,9 @@ export default function CSVImport({ onFeedbackImported }) {
             <li>At minimum, you need a column containing feedback content</li>
             <li>Optional columns: source, category, date</li>
             <li>Example: content,source,category,date</li>
-            <li>The system will automatically analyze sentiment for each feedback</li>
+            <li>🤖 The system will automatically analyze each feedback with AI for categorization and sentiment</li>
+            <li>📊 If you provide a category column, it will override AI suggestions</li>
+            <li>⏱️ Processing may take longer due to AI analysis (about 1-2 seconds per feedback)</li>
           </ul>
         </div>
       </div>

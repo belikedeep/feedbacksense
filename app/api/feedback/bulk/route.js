@@ -61,17 +61,25 @@ export async function POST(request) {
       }
     }
 
-    // Prepare feedback data for bulk insert
+    // Prepare feedback data for bulk insert with AI fields
     const feedbackData = feedbacks.map(feedback => ({
       userId: user.id,
       content: feedback.content,
       source: feedback.source || 'csv_import',
-      category: feedback.category || 'general',
+      category: feedback.category || 'general_inquiry',
       sentimentScore: feedback.sentimentScore || 0.5,
       sentimentLabel: feedback.sentimentLabel || 'neutral',
       topics: feedback.topics || [],
-      feedbackDate: feedback.feedbackDate ? new Date(feedback.feedbackDate) : new Date()
+      feedbackDate: feedback.feedbackDate ? new Date(feedback.feedbackDate) : new Date(),
+      // AI categorization fields
+      aiCategoryConfidence: feedback.aiCategoryConfidence || null,
+      aiClassificationMeta: feedback.aiClassificationMeta || null,
+      classificationHistory: feedback.classificationHistory || [],
+      manualOverride: feedback.manualOverride || false
     }))
+
+    // Count how many have AI analysis
+    const aiAnalyzedCount = feedbacks.filter(f => f.aiCategoryConfidence !== null && f.aiCategoryConfidence !== undefined).length
 
     // Bulk insert feedback
     const createdFeedbacks = await prisma.feedback.createMany({
@@ -92,6 +100,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       count: createdFeedbacks.count,
+      aiAnalyzed: aiAnalyzedCount,
       feedbacks: result
     })
   } catch (error) {
