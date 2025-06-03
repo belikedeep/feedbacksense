@@ -6,6 +6,8 @@ import FeedbackForm from './FeedbackForm'
 import CSVImport from './CSVImport'
 import FeedbackList from './FeedbackList'
 import Analytics from './Analytics'
+import CategoryAnalytics from './CategoryAnalytics'
+import AIPerformanceMetrics from './AIPerformanceMetrics'
 
 export default function Dashboard({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -149,6 +151,8 @@ export default function Dashboard({ user, onSignOut }) {
               { id: 'add-feedback', label: 'Add Feedback' },
               { id: 'import-csv', label: 'Import CSV' },
               { id: 'feedback-list', label: 'All Feedback' },
+              { id: 'category-analytics', label: 'Category Analytics' },
+              { id: 'ai-performance', label: 'AI Performance' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -164,14 +168,41 @@ export default function Dashboard({ user, onSignOut }) {
             ))}
           </nav>
           
-          {/* Re-analyze button */}
-          <button
-            onClick={reanalyzeAllFeedback}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-            title="Re-analyze all feedback with improved sentiment analysis"
-          >
-            🔄 Fix Sentiment Scores
-          </button>
+          {/* AI Quick Actions */}
+          <div className="flex space-x-3">
+            <button
+              onClick={reanalyzeAllFeedback}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              title="Re-analyze all feedback with AI categorization"
+            >
+              🤖 Re-analyze All
+            </button>
+            <button
+              onClick={() => {
+                const csvData = feedback.map(f => ({
+                  content: f.content,
+                  category: f.category,
+                  aiConfidence: f.aiCategoryConfidence ? Math.round(f.aiCategoryConfidence * 100) + '%' : 'N/A',
+                  manualOverride: f.manualOverride ? 'Yes' : 'No',
+                  sentiment: f.sentimentLabel || f.sentiment_label,
+                  source: f.source,
+                  date: f.feedbackDate || f.feedback_date
+                }))
+                const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(
+                  'Content,Category,AI Confidence,Manual Override,Sentiment,Source,Date\n' +
+                  csvData.map(row => Object.values(row).map(val => `"${val}"`).join(',')).join('\n')
+                )
+                const link = document.createElement('a')
+                link.href = csv
+                link.download = 'feedback-category-report.csv'
+                link.click()
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              title="Export category analysis report"
+            >
+              📊 Export Report
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -186,6 +217,8 @@ export default function Dashboard({ user, onSignOut }) {
               {activeTab === 'add-feedback' && <FeedbackForm onFeedbackAdded={addFeedback} />}
               {activeTab === 'import-csv' && <CSVImport onFeedbackImported={addBulkFeedback} />}
               {activeTab === 'feedback-list' && <FeedbackList feedback={feedback} onUpdate={fetchFeedback} />}
+              {activeTab === 'category-analytics' && <CategoryAnalytics feedback={feedback} />}
+              {activeTab === 'ai-performance' && <AIPerformanceMetrics feedback={feedback} />}
             </>
           )}
         </div>

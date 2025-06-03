@@ -39,6 +39,12 @@ export default function FeedbackList({ feedback, onUpdate }) {
     return 'Low'
   }
 
+  const getConfidenceIcon = (confidence) => {
+    if (confidence >= 0.8) return '🟢'
+    if (confidence >= 0.5) return '🟡'
+    return '🔴'
+  }
+
   const updateFeedbackCategory = async (id, category) => {
     setUpdatingFeedback(id)
     try {
@@ -215,7 +221,7 @@ export default function FeedbackList({ feedback, onUpdate }) {
                         {/* AI Confidence Badge */}
                         {item.aiCategoryConfidence !== null && (
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getConfidenceColor(item.aiCategoryConfidence)}`}>
-                            AI: {getConfidenceLabel(item.aiCategoryConfidence)}
+                            {getConfidenceIcon(item.aiCategoryConfidence)} AI: {getConfidenceLabel(item.aiCategoryConfidence)} ({Math.round(item.aiCategoryConfidence * 100)}%)
                           </span>
                         )}
                         

@@ -13,7 +13,7 @@ import {
   PointElement,
   LineElement,
 } from 'chart.js'
-import { Bar, Pie, Line } from 'react-chartjs-2'
+import { Bar, Pie, Line, Doughnut } from 'react-chartjs-2'
 import TimeRangeSelector from './TimeRangeSelector'
 import ExportPanel from './ExportPanel'
 import { format, isWithinInterval, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns'
@@ -76,7 +76,16 @@ export default function Analytics({ feedback }) {
         categoryDistribution: {},
         sourceDistribution: {},
         recentTrend: [],
-        averageSentiment: 0
+        averageSentiment: 0,
+        aiMetrics: {
+          totalAIAnalyzed: 0,
+          averageConfidence: 0,
+          highConfidenceCount: 0,
+          manualOverrideCount: 0,
+          confidenceDistribution: { high: 0, medium: 0, low: 0 }
+        },
+        categoryConfidenceStats: {},
+        aiCategoryTrends: []
       }
     }
 
@@ -107,6 +116,55 @@ export default function Analytics({ feedback }) {
       acc[f.source] = (acc[f.source] || 0) + 1
       return acc
     }, {})
+
+    // AI Analytics
+    const aiAnalyzedFeedback = filteredFeedback.filter(f => f.aiCategoryConfidence !== null && f.aiCategoryConfidence !== undefined)
+    const totalAIAnalyzed = aiAnalyzedFeedback.length
+    
+    const averageConfidence = totalAIAnalyzed > 0
+      ? aiAnalyzedFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / totalAIAnalyzed
+      : 0
+
+    const highConfidenceCount = aiAnalyzedFeedback.filter(f => parseFloat(f.aiCategoryConfidence || 0) > 0.8).length
+    const manualOverrideCount = filteredFeedback.filter(f => f.manualOverride).length
+
+    // Confidence distribution
+    const confidenceDistribution = aiAnalyzedFeedback.reduce((acc, f) => {
+      const confidence = parseFloat(f.aiCategoryConfidence || 0)
+      if (confidence > 0.8) acc.high++
+      else if (confidence > 0.5) acc.medium++
+      else acc.low++
+      return acc
+    }, { high: 0, medium: 0, low: 0 })
+
+    // Category confidence statistics
+    const categoryConfidenceStats = Object.keys(categoryDistribution).reduce((acc, category) => {
+      const categoryFeedback = filteredFeedback.filter(f => f.category === category)
+      const aiCategoryFeedback = categoryFeedback.filter(f => f.aiCategoryConfidence !== null)
+      
+      acc[category] = {
+        total: categoryFeedback.length,
+        aiAnalyzed: aiCategoryFeedback.length,
+        avgConfidence: aiCategoryFeedback.length > 0
+          ? aiCategoryFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / aiCategoryFeedback.length
+          : 0,
+        manualOverrides: categoryFeedback.filter(f => f.manualOverride).length,
+        sentiment: categoryFeedback.reduce((acc, f) => {
+          const label = f.sentimentLabel || f.sentiment_label || 'neutral'
+          acc[label] = (acc[label] || 0) + 1
+          return acc
+        }, { positive: 0, negative: 0, neutral: 0 })
+      }
+      return acc
+    }, {})
+
+    const aiMetrics = {
+      totalAIAnalyzed,
+      averageConfidence,
+      highConfidenceCount,
+      manualOverrideCount,
+      confidenceDistribution
+    }
 
     // Generate trend data based on selected time range
     const generateTrendData = (startDate, endDate, data) => {
@@ -141,6 +199,33 @@ export default function Analytics({ feedback }) {
     }
 
     const recentTrend = generateTrendData(selectedTimeRange.start, selectedTimeRange.end, filteredFeedback)
+    
+    // AI Category Trends over time
+    const aiCategoryTrends = generateTrendData(selectedTimeRange.start, selectedTimeRange.end, filteredFeedback)
+      .map(trend => ({
+        ...trend,
+        aiAnalyzed: filteredFeedback.filter(f => {
+          const feedbackDate = f.feedbackDate || f.feedback_date
+          if (!feedbackDate) return false
+          const feedbackDateStr = typeof feedbackDate === 'string'
+            ? feedbackDate.split('T')[0]
+            : new Date(feedbackDate).toISOString().split('T')[0]
+          return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+        }).length,
+        avgConfidence: (() => {
+          const dayAIFeedback = filteredFeedback.filter(f => {
+            const feedbackDate = f.feedbackDate || f.feedback_date
+            if (!feedbackDate) return false
+            const feedbackDateStr = typeof feedbackDate === 'string'
+              ? feedbackDate.split('T')[0]
+              : new Date(feedbackDate).toISOString().split('T')[0]
+            return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+          })
+          return dayAIFeedback.length > 0
+            ? dayAIFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / dayAIFeedback.length
+            : 0
+        })()
+      }))
 
     return {
       totalFeedback,
@@ -150,7 +235,10 @@ export default function Analytics({ feedback }) {
       recentTrend,
       averageSentiment,
       previousPeriodData,
-      selectedTimeRange
+      selectedTimeRange,
+      aiMetrics,
+      categoryConfidenceStats,
+      aiCategoryTrends
     }
   }, [filteredFeedback, previousPeriodData, selectedTimeRange])
 
@@ -221,6 +309,63 @@ export default function Analytics({ feedback }) {
         data: analytics.recentTrend.map(d => d.count),
         borderColor: '#3B82F6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.1,
+      },
+      {
+        label: 'AI Analyzed',
+        data: analytics.aiCategoryTrends.map(d => d.aiAnalyzed),
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.1,
+      },
+    ],
+  }
+
+  // AI Confidence Distribution Chart
+  const confidenceChartData = {
+    labels: ['High (>80%)', 'Medium (50-80%)', 'Low (<50%)'],
+    datasets: [
+      {
+        data: [
+          analytics.aiMetrics.confidenceDistribution.high,
+          analytics.aiMetrics.confidenceDistribution.medium,
+          analytics.aiMetrics.confidenceDistribution.low
+        ],
+        backgroundColor: [
+          '#10B981', // green
+          '#F59E0B', // yellow
+          '#EF4444', // red
+        ],
+        borderWidth: 1,
+      },
+    ],
+  }
+
+  // Category AI Performance Chart
+  const categoryAIChartData = {
+    labels: Object.keys(analytics.categoryConfidenceStats).map(cat =>
+      cat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    ),
+    datasets: [
+      {
+        label: 'Average AI Confidence (%)',
+        data: Object.values(analytics.categoryConfidenceStats).map(stat => stat.avgConfidence * 100),
+        backgroundColor: '#8B5CF6',
+        borderColor: '#7C3AED',
+        borderWidth: 1,
+      },
+    ],
+  }
+
+  // AI Confidence Trend Chart
+  const aiConfidenceTrendData = {
+    labels: analytics.aiCategoryTrends.map(d => new Date(d.date).toLocaleDateString()),
+    datasets: [
+      {
+        label: 'Average AI Confidence (%)',
+        data: analytics.aiCategoryTrends.map(d => d.avgConfidence * 100),
+        borderColor: '#8B5CF6',
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
         tension: 0.1,
       },
     ],
@@ -377,6 +522,86 @@ export default function Analytics({ feedback }) {
         </div>
       </div>
 
+      {/* AI Insights Summary Cards */}
+      {analytics.aiMetrics.totalAIAnalyzed > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">🤖 AI Analysis Insights</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg shadow border border-purple-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">🤖</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">AI Analyzed</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {analytics.aiMetrics.totalAIAnalyzed} ({Math.round((analytics.aiMetrics.totalAIAnalyzed / analytics.totalFeedback) * 100)}%)
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg shadow border border-green-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">🎯</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Avg AI Confidence</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {Math.round(analytics.aiMetrics.averageConfidence * 100)}%
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-lg shadow border border-blue-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">⭐</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">High Confidence</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {analytics.aiMetrics.highConfidenceCount} ({Math.round((analytics.aiMetrics.highConfidenceCount / Math.max(analytics.aiMetrics.totalAIAnalyzed, 1)) * 100)}%)
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-lg shadow border border-orange-200">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">✋</span>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Manual Overrides</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {analytics.aiMetrics.manualOverrideCount} ({Math.round((analytics.aiMetrics.manualOverrideCount / analytics.totalFeedback) * 100)}%)
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         {/* Sentiment Distribution */}
@@ -394,6 +619,26 @@ export default function Analytics({ feedback }) {
             <Bar data={categoryChartData} options={chartOptions} />
           </div>
         </div>
+
+        {/* AI Confidence Distribution */}
+        {analytics.aiMetrics.totalAIAnalyzed > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">AI Confidence Distribution</h3>
+            <div className="h-64" data-chart-export data-chart-title="AI Confidence Distribution">
+              <Doughnut data={confidenceChartData} options={chartOptions} />
+            </div>
+          </div>
+        )}
+
+        {/* Category AI Performance */}
+        {analytics.aiMetrics.totalAIAnalyzed > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">AI Performance by Category</h3>
+            <div className="h-64" data-chart-export data-chart-title="AI Performance by Category">
+              <Bar data={categoryAIChartData} options={chartOptions} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Trend Chart */}
@@ -406,6 +651,73 @@ export default function Analytics({ feedback }) {
           <Line data={trendChartData} options={chartOptions} />
         </div>
       </div>
+
+      {/* AI Confidence Trend */}
+      {analytics.aiMetrics.totalAIAnalyzed > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow border mb-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">AI Confidence Trend Over Time</h3>
+          <div className="h-64" data-chart-export data-chart-title="AI Confidence Trend">
+            <Line data={aiConfidenceTrendData} options={chartOptions} />
+          </div>
+        </div>
+      )}
+
+      {/* Category Performance Analytics */}
+      {analytics.aiMetrics.totalAIAnalyzed > 0 && Object.keys(analytics.categoryConfidenceStats).length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow border mb-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Category Performance Analytics</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Analyzed</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Confidence</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manual Overrides</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment Split</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {Object.entries(analytics.categoryConfidenceStats).map(([category, stats]) => (
+                  <tr key={category} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stats.total}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stats.aiAnalyzed} ({Math.round((stats.aiAnalyzed / stats.total) * 100)}%)
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          stats.avgConfidence > 0.8 ? 'bg-green-100 text-green-800' :
+                          stats.avgConfidence > 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {Math.round(stats.avgConfidence * 100)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stats.manualOverrides} ({Math.round((stats.manualOverrides / stats.total) * 100)}%)
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex space-x-1">
+                        <span className="text-green-600">+{stats.sentiment.positive}</span>
+                        <span className="text-gray-600">~{stats.sentiment.neutral}</span>
+                        <span className="text-red-600">-{stats.sentiment.negative}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Source Distribution */}
       <div className="bg-white p-6 rounded-lg shadow border">
