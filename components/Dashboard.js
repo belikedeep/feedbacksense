@@ -123,7 +123,7 @@ export default function Dashboard({ user, onSignOut }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 z-40 w-64 h-screen border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg">
         <div className="flex h-full flex-col">

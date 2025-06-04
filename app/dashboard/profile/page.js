@@ -4,6 +4,19 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { 
+  ArrowLeft, 
+  Settings, 
+  BarChart3, 
+  Plus, 
+  FileUp, 
+  List, 
+  HelpCircle,
+  Download,
+  Activity
+} from 'lucide-react'
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null)
@@ -40,11 +53,14 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-96">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground">Loading your profile...</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -54,117 +70,198 @@ export default function ProfilePage() {
     return null // Will redirect to login
   }
 
+  const quickActions = [
+    {
+      icon: Settings,
+      title: 'Account Settings',
+      description: 'Password & security',
+      href: '/dashboard/settings',
+      color: 'blue'
+    },
+    {
+      icon: BarChart3,
+      title: 'View Analytics',
+      description: 'Dashboard insights',
+      href: '/dashboard',
+      color: 'green'
+    },
+    {
+      icon: Plus,
+      title: 'Add Feedback',
+      description: 'Create new entry',
+      href: '/dashboard?tab=add-feedback',
+      color: 'purple'
+    },
+    {
+      icon: FileUp,
+      title: 'Import Data',
+      description: 'Bulk CSV import',
+      href: '/dashboard?tab=import-csv',
+      color: 'orange'
+    },
+    {
+      icon: List,
+      title: 'All Feedback',
+      description: 'Browse entries',
+      href: '/dashboard?tab=feedback-list',
+      color: 'indigo'
+    },
+    {
+      icon: Download,
+      title: 'Export Data',
+      description: 'Download reports',
+      href: '#',
+      color: 'teal'
+    }
+  ]
+
+  const getColorClasses = (color) => {
+    const colors = {
+      blue: 'bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700',
+      green: 'bg-green-50 border-green-200 hover:bg-green-100 text-green-700',
+      purple: 'bg-purple-50 border-purple-200 hover:bg-purple-100 text-purple-700',
+      orange: 'bg-orange-50 border-orange-200 hover:bg-orange-100 text-orange-700',
+      indigo: 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100 text-indigo-700',
+      teal: 'bg-teal-50 border-teal-200 hover:bg-teal-100 text-teal-700'
+    }
+    return colors[color] || colors.blue
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Modern Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm supports-[backdrop-filter]:bg-white/60 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground flex items-center justify-center shadow-lg">
+                <span className="text-xl">👤</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                  My Profile
+                </h1>
+                <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                ← Back to Dashboard
-              </button>
-            </div>
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/dashboard')}
+              className="gap-2 hover:bg-slate-100"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Navigation Breadcrumb */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex py-4" aria-label="Breadcrumb">
-            <ol className="flex items-center space-x-4">
-              <li>
-                <div>
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    Dashboard
-                  </button>
-                </div>
-              </li>
-              <li>
-                <div className="flex items-center">
-                  <svg
-                    className="flex-shrink-0 h-5 w-5 text-gray-400"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                    aria-hidden="true"
-                  >
-                    <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
-                  </svg>
-                  <span className="ml-4 text-sm font-medium text-gray-500">Profile</span>
-                </div>
-              </li>
-            </ol>
+      {/* Breadcrumb */}
+      <div className="border-b bg-white/50">
+        <div className="container mx-auto px-4 py-3">
+          <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/dashboard')}
+              className="h-auto p-0 text-muted-foreground hover:text-foreground"
+            >
+              Dashboard
+            </Button>
+            <span>/</span>
+            <span className="text-foreground font-medium">Profile</span>
           </nav>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-lg font-medium text-gray-900 mb-2">
-            Manage Your Account
-          </h2>
-          <p className="text-sm text-gray-600">
-            Update your personal information, manage your account settings, and control your preferences.
-          </p>
-        </div>
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          
+          {/* Profile Information */}
+          <UserProfile user={user} />
 
-        {/* Profile Component */}
-        <UserProfile user={user} />
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Quick Actions
+              </CardTitle>
+              <CardDescription>
+                Jump to commonly used features and settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {quickActions.map((action, index) => {
+                  const Icon = action.icon
+                  return (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      onClick={() => router.push(action.href)}
+                      className={`h-auto p-6 flex flex-col items-start gap-3 transition-all duration-200 hover:scale-105 hover:shadow-md ${getColorClasses(action.color)}`}
+                    >
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="h-12 w-12 rounded-xl bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <div className="text-left flex-1">
+                          <div className="font-semibold text-base">{action.title}</div>
+                          <div className="text-sm opacity-80">{action.description}</div>
+                        </div>
+                      </div>
+                    </Button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Additional Settings Preview */}
-        <div className="mt-8 bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
-          </div>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={() => router.push('/dashboard/settings')}
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-4 text-left">
-                  <h4 className="text-sm font-medium text-gray-900">Account Settings</h4>
-                  <p className="text-sm text-gray-500">Password, security, and preferences</p>
-                </div>
-              </button>
+          {/* Help & Support */}
+          <Card className="border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HelpCircle className="h-5 w-5" />
+                Need Help?
+              </CardTitle>
+              <CardDescription>
+                Get support or learn more about FeedbackSense
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 flex flex-col gap-2 hover:bg-blue-50 hover:border-blue-200"
+                >
+                  <div className="text-2xl">📚</div>
+                  <div className="font-medium">Documentation</div>
+                  <div className="text-xs text-muted-foreground">Learn how to use all features</div>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 flex flex-col gap-2 hover:bg-green-50 hover:border-green-200"
+                >
+                  <div className="text-2xl">💬</div>
+                  <div className="font-medium">Contact Support</div>
+                  <div className="text-xs text-muted-foreground">Get help from our team</div>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 flex flex-col gap-2 hover:bg-purple-50 hover:border-purple-200"
+                >
+                  <div className="text-2xl">🎯</div>
+                  <div className="font-medium">Feature Requests</div>
+                  <div className="text-xs text-muted-foreground">Suggest improvements</div>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-              <button
-                onClick={() => alert('Change password feature coming soon!')}
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-4 text-left">
-                  <h4 className="text-sm font-medium text-gray-900">Change Password</h4>
-                  <p className="text-sm text-gray-500">Update your account password</p>
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
       </main>
     </div>
