@@ -40,7 +40,11 @@ export default function AIPerformanceMetrics({ feedback }) {
   const loadMetrics = async () => {
     try {
       setIsLoading(true)
-      const performanceMetrics = await getAIPerformanceMetrics()
+// Debugging: Log metrics data
+// Debugging: Log updated metrics state
+console.log('Updated metrics state:', metrics);
+console.log('Metrics fetched:', performanceMetrics);
+      const performanceMetrics = await getAIPerformanceMetrics();
       setMetrics(performanceMetrics)
     } catch (error) {
       console.error('Error loading AI performance metrics:', error)

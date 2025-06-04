@@ -35,6 +35,22 @@ export async function GET(request) {
           where: {
             userId: user.id
           },
+          include: {
+            notes: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: {
+                createdAt: 'desc'
+              }
+            }
+          },
           orderBy: {
             createdAt: 'desc'
           }
@@ -177,7 +193,13 @@ export async function POST(request) {
       userId: user.id,
       content: content.trim(),
       source: source || 'manual',
-      feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date()
+      feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date(),
+      status: 'new',
+      priority: 'medium',
+      isArchived: false,
+      editHistory: [],
+      lastEditedBy: null,
+      lastEditedAt: null
     }
 
     if (analysisResult) {

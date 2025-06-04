@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import AdvancedSearchPanel from './AdvancedSearchPanel'
 import BulkRecategorization from './BulkRecategorization'
+import EnhancedBulkOperations from './EnhancedBulkOperations'
+import EditFeedbackModal from './EditFeedbackModal'
 import { recordUserFeedback } from '@/lib/geminiAI'
 
 export default function FeedbackList({ feedback, onUpdate }) {
@@ -13,7 +15,9 @@ export default function FeedbackList({ feedback, onUpdate }) {
   const [newCategory, setNewCategory] = useState('')
   const [updatingFeedback, setUpdatingFeedback] = useState(null)
   const [showBulkPanel, setShowBulkPanel] = useState(false)
-  const [viewMode, setViewMode] = useState('list') // 'list' or 'bulk'
+  const [viewMode, setViewMode] = useState('list') // 'list', 'bulk', or 'enhanced'
+  const [editingFeedback, setEditingFeedback] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const handleFilteredResults = (results) => {
     setFilteredFeedback(results)
@@ -140,6 +144,16 @@ export default function FeedbackList({ feedback, onUpdate }) {
     }
   }
 
+  const handleEditFeedback = (feedback) => {
+    setEditingFeedback(feedback)
+    setShowEditModal(true)
+  }
+
+  const closeEditModal = () => {
+    setEditingFeedback(null)
+    setShowEditModal(false)
+  }
+
   // Highlight search terms in content
   const highlightSearchTerms = (content, searchQuery) => {
     if (!searchQuery || !content) return content
@@ -168,6 +182,34 @@ export default function FeedbackList({ feedback, onUpdate }) {
     return category?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'
   }
 
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800'
+      case 'medium': return 'bg-yellow-100 text-yellow-800'
+      case 'low': return 'bg-green-100 text-green-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'new': return 'bg-blue-100 text-blue-800'
+      case 'in_review': return 'bg-yellow-100 text-yellow-800'
+      case 'resolved': return 'bg-green-100 text-green-800'
+      case 'archived': return 'bg-gray-100 text-gray-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPriorityIcon = (priority) => {
+    switch (priority) {
+      case 'high': return '🔴'
+      case 'medium': return '🟡'
+      case 'low': return '🟢'
+      default: return '🟡'
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -188,13 +230,23 @@ export default function FeedbackList({ feedback, onUpdate }) {
             </button>
             <button
               onClick={() => setViewMode('bulk')}
-              className={`px-4 py-2 text-sm font-medium border-t border-r border-b ${
+              className={`px-4 py-2 text-sm font-medium border-t border-b ${
                 viewMode === 'bulk'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              🔄 Legacy Bulk
+            </button>
+            <button
+              onClick={() => setViewMode('enhanced')}
+              className={`px-4 py-2 text-sm font-medium border-t border-r border-b ${
+                viewMode === 'enhanced'
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               } rounded-r-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             >
-              🔄 Bulk Actions
+              ⚡ Enhanced Bulk
             </button>
           </div>
         </div>
@@ -215,6 +267,11 @@ export default function FeedbackList({ feedback, onUpdate }) {
           feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
           onUpdate={onUpdate}
         />
+      ) : viewMode === 'enhanced' ? (
+        <EnhancedBulkOperations
+          feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
+          onUpdate={onUpdate}
+        />
       ) : (
         /* Feedback List */
         <div className="space-y-4">
@@ -230,6 +287,23 @@ export default function FeedbackList({ feedback, onUpdate }) {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentColor(item.sentimentLabel || item.sentiment_label)}`}>
                     {item.sentimentLabel || item.sentiment_label}
                   </span>
+                  
+                  {/* Status Badge */}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status || 'new')}`}>
+                    {item.status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'New'}
+                  </span>
+                  
+                  {/* Priority Badge */}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(item.priority || 'medium')}`}>
+                    {getPriorityIcon(item.priority || 'medium')} {item.priority?.charAt(0).toUpperCase() + item.priority?.slice(1) || 'Medium'}
+                  </span>
+                  
+                  {/* Archived Badge */}
+                  {item.isArchived && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      📁 Archived
+                    </span>
+                  )}
                   
                   {/* Category with AI confidence */}
                   <div className="flex items-center space-x-2">
@@ -322,6 +396,13 @@ export default function FeedbackList({ feedback, onUpdate }) {
                   {/* Quick Actions */}
                   <div className="flex items-center space-x-1">
                     <button
+                      onClick={() => handleEditFeedback(item)}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                      title="Edit feedback"
+                    >
+                      ✏️
+                    </button>
+                    <button
                       onClick={() => triggerReanalysis(item.id)}
                       disabled={updatingFeedback === item.id}
                       className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50"
@@ -405,6 +486,14 @@ export default function FeedbackList({ feedback, onUpdate }) {
         )}
         </div>
       )}
+
+      {/* Edit Feedback Modal */}
+      <EditFeedbackModal
+        feedback={editingFeedback}
+        isOpen={showEditModal}
+        onClose={closeEditModal}
+        onUpdate={onUpdate}
+      />
     </div>
   )
 }

@@ -8,44 +8,59 @@ datasource db {
 }
 
 model Profile {
-  id           String        @id @db.Uuid
+  id           String         @id @db.Uuid
   email        String?
   name         String?
   phone        String?
-  preferences  Json?         @default("{}")
-  timezone     String?       @default("UTC")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  preferences  Json?          @default("{}")
+  timezone     String?        @default("UTC")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   activityLogs ActivityLog[]
   categories   Category[]
   feedback     Feedback[]
+  feedbackNotes FeedbackNote[]
 
   @@map("profiles")
 }
 
 model Feedback {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId                String   @map("user_id") @db.Uuid
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String         @map("user_id") @db.Uuid
   content               String
-  source                String   @default("manual")
-  category              String   @default("general")
-  sentimentScore        Decimal  @default(0.5) @map("sentiment_score") @db.Decimal(3, 2)
-  sentimentLabel        String   @default("neutral") @map("sentiment_label")
-  topics                String[] @default([])
-  feedbackDate          DateTime @default(dbgenerated("CURRENT_DATE")) @map("feedback_date") @db.Date
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  aiCategoryConfidence  Decimal? @map("ai_category_confidence") @db.Decimal(3, 2)
-  aiClassificationMeta  Json?    @map("ai_classification_meta")
-  classificationHistory Json     @default("[]") @map("classification_history")
-  manualOverride        Boolean  @default(false) @map("manual_override")
-  user                  Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source                String         @default("manual")
+  category              String         @default("general")
+  sentimentScore        Decimal        @default(0.5) @map("sentiment_score") @db.Decimal(3, 2)
+  sentimentLabel        String         @default("neutral") @map("sentiment_label")
+  topics                String[]       @default([])
+  feedbackDate          DateTime       @default(dbgenerated("CURRENT_DATE")) @map("feedback_date") @db.Date
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aiCategoryConfidence  Decimal?       @map("ai_category_confidence") @db.Decimal(3, 2)
+  aiClassificationMeta  Json?          @map("ai_classification_meta")
+  classificationHistory Json           @default("[]") @map("classification_history")
+  manualOverride        Boolean        @default(false) @map("manual_override")
+  
+  // Enhanced feedback management fields
+  status                String         @default("new") // new, in_review, resolved, archived
+  priority              String         @default("medium") // high, medium, low
+  isArchived            Boolean        @default(false) @map("is_archived")
+  archivedAt            DateTime?      @map("archived_at") @db.Timestamptz(6)
+  editHistory           Json           @default("[]") @map("edit_history")
+  lastEditedBy          String?        @map("last_edited_by") @db.Uuid
+  lastEditedAt          DateTime?      @map("last_edited_at") @db.Timestamptz(6)
+  
+  user                  Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes                 FeedbackNote[]
 
   @@index([userId])
   @@index([createdAt])
   @@index([sentimentLabel])
   @@index([category])
   @@index([feedbackDate])
+  @@index([status])
+  @@index([priority])
+  @@index([isArchived])
   @@map("feedback")
 }
 
@@ -60,6 +75,24 @@ model Category {
   user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("categories")
+}
+
+model FeedbackNote {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feedbackId String   @map("feedback_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  content    String
+  isInternal Boolean  @default(true) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  user       Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([feedbackId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("feedback_notes")
 }
 
 model ActivityLog {

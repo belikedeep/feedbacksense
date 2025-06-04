@@ -17,6 +17,9 @@ export default function AdvancedSearchPanel({
     categories: [],
     sentiments: [],
     sources: [],
+    statuses: [],
+    priorities: [],
+    showArchived: false,
     sortBy: 'date',
     sortOrder: 'desc'
   })
@@ -25,7 +28,9 @@ export default function AdvancedSearchPanel({
   const filterOptions = {
     categories: [...new Set(feedback.map(f => f.category))].filter(Boolean),
     sentiments: [...new Set(feedback.map(f => f.sentimentLabel || f.sentiment_label))].filter(Boolean),
-    sources: [...new Set(feedback.map(f => f.source))].filter(Boolean)
+    sources: [...new Set(feedback.map(f => f.source))].filter(Boolean),
+    statuses: [...new Set(feedback.map(f => f.status))].filter(Boolean),
+    priorities: [...new Set(feedback.map(f => f.priority))].filter(Boolean)
   }
 
   // Apply all filters to feedback
@@ -63,9 +68,28 @@ export default function AdvancedSearchPanel({
 
     // Apply source filter
     if (currentFilters.sources.length > 0) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         currentFilters.sources.includes(item.source)
       )
+    }
+
+    // Apply status filter
+    if (currentFilters.statuses.length > 0) {
+      filtered = filtered.filter(item =>
+        currentFilters.statuses.includes(item.status || 'new')
+      )
+    }
+
+    // Apply priority filter
+    if (currentFilters.priorities.length > 0) {
+      filtered = filtered.filter(item =>
+        currentFilters.priorities.includes(item.priority || 'medium')
+      )
+    }
+
+    // Apply archived filter
+    if (!currentFilters.showArchived) {
+      filtered = filtered.filter(item => !item.isArchived)
     }
 
     // Apply search filter
@@ -86,11 +110,23 @@ export default function AdvancedSearchPanel({
           aValue = parseFloat(a.sentimentScore || a.sentiment_score || 0)
           bValue = parseFloat(b.sentimentScore || b.sentiment_score || 0)
           break
+        case 'priority':
+          // Priority order: high > medium > low
+          const priorityOrder = { high: 3, medium: 2, low: 1 }
+          aValue = priorityOrder[a.priority] || 2
+          bValue = priorityOrder[b.priority] || 2
+          break
+        case 'status':
+          // Status order: new > in_review > resolved > archived
+          const statusOrder = { new: 4, in_review: 3, resolved: 2, archived: 1 }
+          aValue = statusOrder[a.status] || 4
+          bValue = statusOrder[b.status] || 4
+          break
         case 'relevance':
           // For relevance, prioritize search matches
-          aValue = currentFilters.searchQuery ? 
+          aValue = currentFilters.searchQuery ?
             (a.content.toLowerCase().includes(currentFilters.searchQuery.toLowerCase()) ? 1 : 0) : 0
-          bValue = currentFilters.searchQuery ? 
+          bValue = currentFilters.searchQuery ?
             (b.content.toLowerCase().includes(currentFilters.searchQuery.toLowerCase()) ? 1 : 0) : 0
           break
         default:
@@ -161,18 +197,24 @@ export default function AdvancedSearchPanel({
       categories: [],
       sentiments: [],
       sources: [],
+      statuses: [],
+      priorities: [],
+      showArchived: false,
       sortBy: 'date',
       sortOrder: 'desc'
     })
   }
 
-  const hasActiveFilters = 
+  const hasActiveFilters =
     filters.searchQuery ||
     filters.dateRange.start ||
     filters.dateRange.end ||
     filters.categories.length > 0 ||
     filters.sentiments.length > 0 ||
-    filters.sources.length > 0
+    filters.sources.length > 0 ||
+    filters.statuses.length > 0 ||
+    filters.priorities.length > 0 ||
+    filters.showArchived
 
   const getResultsCount = () => {
     return applyFilters(feedback, filters).length
@@ -301,6 +343,71 @@ export default function AdvancedSearchPanel({
             </div>
           </div>
 
+          {/* Enhanced Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <div className="space-y-2">
+                {filterOptions.statuses.map(status => (
+                  <label key={status} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.statuses.includes(status)}
+                      onChange={() => handleMultiSelectChange('statuses', status)}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 capitalize">
+                      {status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'New'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority
+              </label>
+              <div className="space-y-2">
+                {filterOptions.priorities.map(priority => (
+                  <label key={priority} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.priorities.includes(priority)}
+                      onChange={() => handleMultiSelectChange('priorities', priority)}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 capitalize">
+                      {priority?.charAt(0).toUpperCase() + priority?.slice(1) || 'Medium'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Archive Options */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Archive Options
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={filters.showArchived}
+                    onChange={(e) => setFilters(prev => ({ ...prev, showArchived: e.target.checked }))}
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Include Archived Items</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           {/* Sorting Options */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -314,6 +421,8 @@ export default function AdvancedSearchPanel({
               >
                 <option value="date">Date</option>
                 <option value="sentiment">Sentiment Score</option>
+                <option value="priority">Priority</option>
+                <option value="status">Status</option>
                 <option value="relevance">Relevance</option>
               </select>
               <select

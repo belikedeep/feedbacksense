@@ -71,7 +71,11 @@ export async function PUT(request, { params }) {
       sentimentLabel,
       topics,
       feedbackDate,
-      reanalyze = false // Flag to trigger AI re-analysis
+      status,
+      priority,
+      isArchived,
+      reanalyze = false, // Flag to trigger AI re-analysis
+      bulkOperation = false // Flag for bulk operations
     } = body
 
     // First, get the existing feedback to check current state
@@ -93,7 +97,19 @@ export async function PUT(request, { params }) {
       sentimentScore,
       sentimentLabel,
       topics,
-      feedbackDate: feedbackDate ? new Date(feedbackDate) : undefined
+      feedbackDate: feedbackDate ? new Date(feedbackDate) : undefined,
+      status,
+      priority
+    }
+
+    // Handle archiving
+    if (isArchived !== undefined) {
+      updateData.isArchived = isArchived
+      if (isArchived) {
+        updateData.archivedAt = new Date()
+      } else {
+        updateData.archivedAt = null
+      }
     }
 
     // Handle category changes and manual overrides
@@ -101,9 +117,49 @@ export async function PUT(request, { params }) {
       ? [...existingFeedback.classificationHistory]
       : []
 
+    // Handle edit history for content changes
+    let editHistory = Array.isArray(existingFeedback.editHistory)
+      ? [...existingFeedback.editHistory]
+      : []
+
     // Check if category was manually changed
     const categoryChanged = category && category !== existingFeedback.category
     const contentChanged = content && content !== existingFeedback.content
+    const hasSignificantChanges = contentChanged || categoryChanged ||
+      (status && status !== existingFeedback.status) ||
+      (priority && priority !== existingFeedback.priority)
+
+    // Track edit history for significant changes (but not for bulk operations)
+    if (hasSignificantChanges && !bulkOperation) {
+      const editEntry = {
+        timestamp: new Date().toISOString(),
+        editedBy: user.id,
+        changes: {},
+        previousValues: {}
+      }
+
+      if (contentChanged) {
+        editEntry.changes.content = content
+        editEntry.previousValues.content = existingFeedback.content
+      }
+      if (categoryChanged) {
+        editEntry.changes.category = category
+        editEntry.previousValues.category = existingFeedback.category
+      }
+      if (status && status !== existingFeedback.status) {
+        editEntry.changes.status = status
+        editEntry.previousValues.status = existingFeedback.status
+      }
+      if (priority && priority !== existingFeedback.priority) {
+        editEntry.changes.priority = priority
+        editEntry.previousValues.priority = existingFeedback.priority
+      }
+
+      editHistory.push(editEntry)
+      updateData.editHistory = editHistory
+      updateData.lastEditedBy = user.id
+      updateData.lastEditedAt = new Date()
+    }
 
     if (categoryChanged) {
       // Add manual override to classification history
