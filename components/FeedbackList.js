@@ -7,6 +7,15 @@ import BulkRecategorization from './BulkRecategorization'
 import EnhancedBulkOperations from './EnhancedBulkOperations'
 import EditFeedbackModal from './EditFeedbackModal'
 import { recordUserFeedback } from '@/lib/geminiAI'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function FeedbackList({ feedback, onUpdate }) {
   const [filteredFeedback, setFilteredFeedback] = useState(feedback)
@@ -211,281 +220,414 @@ export default function FeedbackList({ feedback, onUpdate }) {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">All Feedback</h2>
-        
-        {/* View Mode Toggle */}
-        <div className="flex items-center space-x-4">
-          <div className="flex rounded-md shadow-sm" role="group">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-4 py-2 text-sm font-medium border ${
-                viewMode === 'list'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              } rounded-l-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-            >
-              📝 List View
-            </button>
-            <button
-              onClick={() => setViewMode('bulk')}
-              className={`px-4 py-2 text-sm font-medium border-t border-b ${
-                viewMode === 'bulk'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-            >
-              🔄 Legacy Bulk
-            </button>
-            <button
-              onClick={() => setViewMode('enhanced')}
-              className={`px-4 py-2 text-sm font-medium border-t border-r border-b ${
-                viewMode === 'enhanced'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              } rounded-r-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-            >
-              ⚡ Enhanced Bulk
-            </button>
+    <div className="space-y-6">
+      {/* Header with Stats */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredFeedback.length} of {feedback.length} feedback entries
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-200 gap-1">
+              <span className="h-2 w-2 rounded-full bg-green-500"></span>
+              {feedback.filter(f => (f.sentimentLabel || f.sentiment_label) === 'positive').length} Positive
+            </Badge>
+            <Badge className="bg-red-100 text-red-700 hover:bg-red-200 gap-1">
+              <span className="h-2 w-2 rounded-full bg-red-500"></span>
+              {feedback.filter(f => (f.sentimentLabel || f.sentiment_label) === 'negative').length} Negative
+            </Badge>
+            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 gap-1">
+              <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+              {feedback.filter(f => f.aiCategoryConfidence !== null).length} AI Analyzed
+            </Badge>
           </div>
         </div>
       </div>
-      
-      {/* Advanced Search Panel - Show in both modes */}
-      {viewMode === 'list' && (
-        <AdvancedSearchPanel
-          feedback={feedback}
-          onFilteredResults={handleFilteredResults}
-          onFiltersChange={handleFiltersChange}
-        />
-      )}
 
-      {/* Conditional Content Based on View Mode */}
-      {viewMode === 'bulk' ? (
-        <BulkRecategorization
-          feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
-          onUpdate={onUpdate}
-        />
-      ) : viewMode === 'enhanced' ? (
-        <EnhancedBulkOperations
-          feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
-          onUpdate={onUpdate}
-        />
-      ) : (
-        /* Feedback List */
-        <div className="space-y-4">
-        {filteredFeedback.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No feedback found matching your filters.</p>
-          </div>
-        ) : (
-          filteredFeedback.map((item) => (
-            <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center space-x-3 flex-wrap">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSentimentColor(item.sentimentLabel || item.sentiment_label)}`}>
-                    {item.sentimentLabel || item.sentiment_label}
-                  </span>
-                  
-                  {/* Status Badge */}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status || 'new')}`}>
-                    {item.status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'New'}
-                  </span>
-                  
-                  {/* Priority Badge */}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(item.priority || 'medium')}`}>
-                    {getPriorityIcon(item.priority || 'medium')} {item.priority?.charAt(0).toUpperCase() + item.priority?.slice(1) || 'Medium'}
-                  </span>
-                  
-                  {/* Archived Badge */}
-                  {item.isArchived && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                      📁 Archived
-                    </span>
-                  )}
-                  
-                  {/* Category with AI confidence */}
-                  <div className="flex items-center space-x-2">
-                    {editingCategory === item.id ? (
-                      <div className="flex items-center space-x-2">
-                        <select
-                          value={newCategory}
-                          onChange={(e) => setNewCategory(e.target.value)}
-                          className="text-sm border border-gray-300 rounded px-2 py-1"
-                          disabled={updatingFeedback === item.id}
+      {/* Main Content with Tabs */}
+      <Tabs value={viewMode} onValueChange={setViewMode} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="list" className="gap-2">
+            📋 List View
+          </TabsTrigger>
+          <TabsTrigger value="bulk" className="gap-2">
+            🔄 Legacy Bulk
+          </TabsTrigger>
+          <TabsTrigger value="enhanced" className="gap-2">
+            ⚡ Enhanced Bulk
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="space-y-6">
+          {/* Search Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">🔍</span>
+                Advanced Search & Filters
+              </CardTitle>
+              <CardDescription>
+                Search through your feedback using advanced filters and criteria
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdvancedSearchPanel
+                feedback={feedback}
+                onFilteredResults={handleFilteredResults}
+                onFiltersChange={handleFiltersChange}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Feedback List */}
+          <div className="space-y-4">
+            {filteredFeedback.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-xl font-semibold mb-2">No Feedback Found</h3>
+                  <p className="text-muted-foreground text-center mb-6">
+                    Try adjusting your search criteria or filters to find more feedback.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.dispatchEvent(new CustomEvent('switchTab', { detail: 'add-feedback' }))}
+                    className="gap-2"
+                  >
+                    <span>➕</span>
+                    Add New Feedback
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredFeedback.map((item) => (
+                <Card key={item.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    {/* Header with badges and actions */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Sentiment Badge */}
+                        <Badge
+                          className={
+                            (item.sentimentLabel || item.sentiment_label) === 'positive' ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                            (item.sentimentLabel || item.sentiment_label) === 'negative' ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                            'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }
                         >
-                          <option value="">Select category</option>
-                          {categories.map(cat => (
-                            <option key={cat.value} value={cat.value}>{cat.label}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => updateFeedbackCategory(item.id, newCategory)}
-                          disabled={!newCategory || updatingFeedback === item.id}
-                          className="text-green-600 hover:text-green-800 text-sm disabled:opacity-50"
+                          {(item.sentimentLabel || item.sentiment_label) === 'positive' ? '😊' :
+                           (item.sentimentLabel || item.sentiment_label) === 'negative' ? '😔' : '😐'} {item.sentimentLabel || item.sentiment_label}
+                        </Badge>
+                        
+                        {/* Status Badge */}
+                        <Badge
+                          className={
+                            item.status === 'new' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                            item.status === 'in_review' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                            item.status === 'resolved' ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                            item.status === 'archived' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' :
+                            'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }
                         >
-                          {updatingFeedback === item.id ? '...' : '✓'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingCategory(null)
-                            setNewCategory('')
-                          }}
-                          disabled={updatingFeedback === item.id}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          {item.status === 'new' ? '🆕' :
+                           item.status === 'in_review' ? '👀' :
+                           item.status === 'resolved' ? '✅' :
+                           item.status === 'archived' ? '📁' : '🆕'} {item.status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'New'}
+                        </Badge>
+                        
+                        {/* Priority Badge */}
+                        <Badge
+                          className={
+                            item.priority === 'high' ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                            item.priority === 'medium' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' :
+                            'bg-green-100 text-green-700 hover:bg-green-200'
+                          }
                         >
-                          ✗
-                        </button>
+                          {getPriorityIcon(item.priority || 'medium')} {item.priority?.charAt(0).toUpperCase() + item.priority?.slice(1) || 'Medium'}
+                        </Badge>
+                        
+                        {/* Archive Badge */}
+                        {item.isArchived && (
+                          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200">
+                            📁 Archived
+                          </Badge>
+                        )}
+                        
+                        {/* Source Badge */}
+                        <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-xs">
+                          📡 {item.source}
+                        </Badge>
                       </div>
-                    ) : (
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className="text-sm font-medium text-gray-700 cursor-pointer hover:text-blue-600"
-                          onClick={() => {
-                            setEditingCategory(item.id)
-                            setNewCategory(item.category || '')
-                          }}
-                          title="Click to edit category"
-                        >
-                          {formatCategoryName(item.category)}
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {(() => {
+                            const date = item.feedbackDate || item.feedback_date
+                            if (!date) return 'No date'
+                            const dateObj = new Date(date)
+                            return isNaN(dateObj.getTime()) ? 'Invalid date' : dateObj.toLocaleDateString()
+                          })()}
                         </span>
                         
-                        {/* Enhanced AI Confidence Badge */}
-                        {item.aiCategoryConfidence !== null && (
-                          <div className="flex items-center space-x-1">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getConfidenceColor(item.aiCategoryConfidence)}`}>
-                              {getConfidenceIcon(item.aiCategoryConfidence)} AI: {getConfidenceLabel(item.aiCategoryConfidence)} ({Math.round(item.aiCategoryConfidence * 100)}%)
-                            </span>
-                            {item.method && (
-                              <span className="text-xs text-gray-400" title={`Classification method: ${item.method}`}>
-                                {item.method === 'ai_enhanced' ? '🤖' : item.method === 'fallback_enhanced' ? '🔤' : '📊'}
-                              </span>
-                            )}
-                            {item.keyIndicators && item.keyIndicators.length > 0 && (
-                              <span className="text-xs text-gray-400" title={`Key indicators: ${item.keyIndicators.join(', ')}`}>
-                                🔍
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Manual Override Indicator */}
-                        {item.manualOverride && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700" title="Manually categorized">
-                            Manual
+                        {/* Quick Actions */}
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditFeedback(item)}
+                            title="Edit feedback"
+                          >
+                            ✏️
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => triggerReanalysis(item.id)}
+                            disabled={updatingFeedback === item.id}
+                            title="Re-analyze with AI"
+                          >
+                            {updatingFeedback === item.id ? '⏳' : '🤖'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteFeedback(item.id)}
+                            title="Delete feedback"
+                          >
+                            🗑️
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Section */}
+                    <div className="mb-4">
+                      {editingCategory === item.id ? (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={newCategory || "none"}
+                            onValueChange={(value) => setNewCategory(value === "none" ? "" : value)}
+                            disabled={updatingFeedback === item.id}
+                          >
+                            <SelectTrigger className="w-64">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Select category</SelectItem>
+                              {categories.map(cat => (
+                                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            onClick={() => updateFeedbackCategory(item.id, newCategory)}
+                            disabled={!newCategory || updatingFeedback === item.id}
+                          >
+                            {updatingFeedback === item.id ? '⏳' : '✓'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingCategory(null)
+                              setNewCategory('')
+                            }}
+                            disabled={updatingFeedback === item.id}
+                          >
+                            ✗
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            variant="ghost"
+                            className="h-auto p-1 font-medium hover:bg-accent"
+                            onClick={() => {
+                              setEditingCategory(item.id)
+                              setNewCategory(item.category || '')
+                            }}
+                          >
+                            📂 {formatCategoryName(item.category)}
+                          </Button>
+                          
+                          {/* AI Confidence Badge */}
+                          {item.aiCategoryConfidence !== null && (
+                            <div className="flex items-center gap-1">
+                              <Badge
+                                className={
+                                  item.aiCategoryConfidence >= 0.8 ? 'bg-green-100 text-green-700 hover:bg-green-200 text-xs' :
+                                  item.aiCategoryConfidence >= 0.6 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 text-xs' :
+                                  'bg-red-100 text-red-700 hover:bg-red-200 text-xs'
+                                }
+                              >
+                                🤖 {getConfidenceLabel(item.aiCategoryConfidence)} ({Math.round(item.aiCategoryConfidence * 100)}%)
+                              </Badge>
+                              
+                              {item.method && (
+                                <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-xs" title={`Classification method: ${item.method}`}>
+                                  {item.method === 'ai_enhanced' ? '🤖' : item.method === 'fallback_enhanced' ? '🔤' : '📊'}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Manual Override Indicator */}
+                          {item.manualOverride && (
+                            <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-xs">
+                              👤 Manual
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="mb-4">
+                      <p className="text-foreground leading-relaxed">
+                        {highlightSearchTerms(item.content, currentFilters.searchQuery)}
+                      </p>
+                    </div>
+
+                    {/* Analytics Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm text-muted-foreground">Sentiment Score</Label>
+                        <div className="flex items-center gap-2">
+                          <Progress
+                            value={parseFloat(item.sentimentScore || item.sentiment_score || 0) * 100}
+                            className={`w-16 h-2 ${
+                              (item.sentimentLabel || item.sentiment_label) === 'positive' ? '[&>div]:bg-green-500' :
+                              (item.sentimentLabel || item.sentiment_label) === 'negative' ? '[&>div]:bg-red-500' :
+                              '[&>div]:bg-gray-500'
+                            }`}
+                          />
+                          <span className={`text-sm font-medium ${
+                            (item.sentimentLabel || item.sentiment_label) === 'positive' ? 'text-green-600' :
+                            (item.sentimentLabel || item.sentiment_label) === 'negative' ? 'text-red-600' :
+                            'text-gray-600'
+                          }`}>
+                            {(parseFloat(item.sentimentScore || item.sentiment_score || 0) * 100).toFixed(1)}%
                           </span>
-                        )}
+                        </div>
+                      </div>
+                      
+                      {item.aiCategoryConfidence !== null && (
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm text-muted-foreground">AI Confidence</Label>
+                          <div className="flex items-center gap-2">
+                            <Progress
+                              value={item.aiCategoryConfidence * 100}
+                              className={`w-16 h-2 ${
+                                item.aiCategoryConfidence >= 0.8 ? '[&>div]:bg-green-500' :
+                                item.aiCategoryConfidence >= 0.6 ? '[&>div]:bg-yellow-500' :
+                                '[&>div]:bg-red-500'
+                              }`}
+                            />
+                            <span className={`text-sm font-medium ${
+                              item.aiCategoryConfidence >= 0.8 ? 'text-green-600' :
+                              item.aiCategoryConfidence >= 0.6 ? 'text-yellow-600' :
+                              'text-red-600'
+                            }`}>
+                              {Math.round(item.aiCategoryConfidence * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Topics */}
+                    {item.topics && item.topics.length > 0 && (
+                      <div className="mb-4">
+                        <Label className="text-sm text-muted-foreground mb-2 block">Extracted Topics</Label>
+                        <div className="flex flex-wrap gap-1">
+                          {item.topics.map((topic, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {topic}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     )}
-                  </div>
-                  
-                  <span className="text-sm text-gray-500">{item.source}</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-500">
-                    {(() => {
-                      const date = item.feedbackDate || item.feedback_date
-                      if (!date) return 'No date'
-                      const dateObj = new Date(date)
-                      return isNaN(dateObj.getTime()) ? 'Invalid date' : dateObj.toLocaleDateString()
-                    })()}
-                  </span>
-                  
-                  {/* Quick Actions */}
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => handleEditFeedback(item)}
-                      className="text-green-600 hover:text-green-800 text-sm"
-                      title="Edit feedback"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => triggerReanalysis(item.id)}
-                      disabled={updatingFeedback === item.id}
-                      className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50"
-                      title="Re-analyze with AI"
-                    >
-                      {updatingFeedback === item.id ? '...' : '🤖'}
-                    </button>
-                    <button
-                      onClick={() => deleteFeedback(item.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                      title="Delete feedback"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              <p className="text-gray-900 mb-3">
-                {highlightSearchTerms(item.content, currentFilters.searchQuery)}
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-500">
-                <div className="flex items-center justify-between">
-                  <span>Sentiment Score:</span>
-                  <span className="font-medium">
-                    {(parseFloat(item.sentimentScore || item.sentiment_score || 0) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                
-                {item.aiCategoryConfidence !== null && (
-                  <div className="flex items-center justify-between">
-                    <span>AI Confidence:</span>
-                    <span className={`font-medium ${getConfidenceColor(item.aiCategoryConfidence).replace('bg-', 'text-').replace('-100', '-600')}`}>
-                      {Math.round(item.aiCategoryConfidence * 100)}%
-                    </span>
-                  </div>
-                )}
-                
-                {item.topics && item.topics.length > 0 && (
-                  <div className="md:col-span-2">
-                    <span className="font-medium">Topics: </span>
-                    <div className="inline-flex flex-wrap gap-1 mt-1">
-                      {item.topics.map((topic, index) => (
-                        <span key={index} className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {item.classificationHistory && item.classificationHistory.length > 1 && (
-                  <div className="md:col-span-2">
-                    <details className="cursor-pointer">
-                      <summary className="text-xs text-blue-600 hover:text-blue-800">
-                        View Classification History ({item.classificationHistory.length} entries)
-                      </summary>
-                      <div className="mt-2 space-y-1">
-                        {item.classificationHistory.slice(-3).map((history, index) => (
-                          <div key={index} className="text-xs p-2 bg-gray-50 rounded">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{formatCategoryName(history.category)}</span>
-                              <span>{new Date(history.timestamp).toLocaleDateString()}</span>
-                            </div>
-                            <div className="text-gray-600">
-                              {history.method} - {Math.round(history.confidence * 100)}% confidence
-                            </div>
-                            {history.reasoning && (
-                              <div className="text-gray-500 italic">{history.reasoning}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-        </div>
-      )}
+
+                    {/* Classification History */}
+                    {item.classificationHistory && item.classificationHistory.length > 1 && (
+                      <details className="mt-4">
+                        <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium">
+                          📊 View Classification History ({item.classificationHistory.length} entries)
+                        </summary>
+                        <div className="mt-3 space-y-2 pl-4">
+                          {item.classificationHistory.slice(-3).map((history, index) => (
+                            <Card key={index} className="p-3">
+                              <div className="flex justify-between items-center mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {formatCategoryName(history.category)}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(history.timestamp).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {history.method} - {Math.round(history.confidence * 100)}% confidence
+                              </div>
+                              {history.reasoning && (
+                                <div className="text-xs text-muted-foreground italic mt-1">
+                                  {history.reasoning}
+                                </div>
+                              )}
+                            </Card>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="bulk">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">🔄</span>
+                Legacy Bulk Operations
+              </CardTitle>
+              <CardDescription>
+                Traditional bulk categorization and management tools
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BulkRecategorization
+                feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
+                onUpdate={onUpdate}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="enhanced">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">⚡</span>
+                Enhanced Bulk Operations
+              </CardTitle>
+              <CardDescription>
+                Advanced bulk operations with AI-powered features and analytics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EnhancedBulkOperations
+                feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
+                onUpdate={onUpdate}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Feedback Modal */}
       <EditFeedbackModal

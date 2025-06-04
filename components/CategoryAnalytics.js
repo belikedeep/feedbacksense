@@ -15,6 +15,14 @@ import {
 } from 'chart.js'
 import { Bar, Pie, Line } from 'react-chartjs-2'
 import { format, isWithinInterval, subDays, startOfDay, endOfDay } from 'date-fns'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 
 ChartJS.register(
   CategoryScale,
@@ -228,179 +236,364 @@ export default function CategoryAnalytics({ feedback }) {
 
   if (!feedback || feedback.length === 0) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Category Analytics</h2>
-        <p className="text-gray-500">No feedback data available for category analysis.</p>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <div className="text-6xl mb-4">📊</div>
+          <h3 className="text-xl font-semibold mb-2">No Category Data Available</h3>
+          <p className="text-muted-foreground text-center mb-6">
+            Start by adding some feedback to see detailed category analytics and insights.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="default"
+              className="gap-2"
+              onClick={() => window.dispatchEvent(new CustomEvent('switchTab', { detail: 'add-feedback' }))}
+            >
+              <span>➕</span>
+              Add Feedback
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => window.dispatchEvent(new CustomEvent('switchTab', { detail: 'import-csv' }))}
+            >
+              <span>📁</span>
+              Import CSV
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Category Analytics</h2>
-        <button
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Analyzing {Object.keys(analytics.categories).length} categories with {feedback.length} total feedback entries
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 gap-1">
+              <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+              {Object.keys(analytics.categories).length} Categories
+            </Badge>
+            <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 gap-1">
+              <span className="h-2 w-2 rounded-full bg-purple-500"></span>
+              {Object.values(analytics.categories).reduce((sum, cat) => sum + cat.aiAnalyzed, 0)} AI Analyzed
+            </Badge>
+          </div>
+        </div>
+        
+        <Button
           onClick={exportCategoryReport}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          variant="outline"
+          className="gap-2"
         >
           📊 Export Report
-        </button>
+        </Button>
       </div>
 
       {/* Category Selector */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Analyze Category:
-        </label>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="block w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="all">All Categories</option>
-          {categoryNames.map(category => (
-            <option key={category} value={category}>
-              {formatCategoryName(category)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-xl">🎯</span>
+            Category Analysis
+          </CardTitle>
+          <CardDescription>
+            Select a specific category to view detailed analytics or analyze all categories
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Label htmlFor="category-select" className="text-sm font-medium min-w-fit">
+              Focus on Category:
+            </Label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select category to analyze" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">📊 All Categories</SelectItem>
+                {categoryNames.map(category => (
+                  <SelectItem key={category} value={category}>
+                    📂 {formatCategoryName(category)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Category Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(filteredData).map(([category, data]) => (
-          <div key={category} className="bg-white p-6 rounded-lg shadow border">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {formatCategoryName(category)}
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total Feedback:</span>
-                <span className="font-medium">{data.count}</span>
+          <Card key={category} className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                📂 {formatCategoryName(category)}
+              </CardTitle>
+              <CardDescription>
+                Category performance metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Total Feedback</Label>
+                  <div className="text-2xl font-bold text-blue-600">{data.count}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">AI Analyzed</Label>
+                  <div className="text-lg font-semibold text-purple-600">
+                    {data.aiAnalyzed}
+                    <span className="text-sm text-muted-foreground ml-1">
+                      ({Math.round((data.aiAnalyzed / data.count) * 100)}%)
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">AI Analyzed:</span>
-                <span className="font-medium">{data.aiAnalyzed} ({Math.round((data.aiAnalyzed / data.count) * 100)}%)</span>
+              
+              <Separator />
+              
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-xs text-muted-foreground">AI Confidence</Label>
+                    <Badge
+                      className={
+                        data.avgConfidence >= 0.8 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                        data.avgConfidence >= 0.6 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                        'bg-red-100 text-red-700 hover:bg-red-200'
+                      }
+                    >
+                      {Math.round(data.avgConfidence * 100)}%
+                    </Badge>
+                  </div>
+                  <Progress
+                    value={data.avgConfidence * 100}
+                    className={`h-2 ${
+                      data.avgConfidence >= 0.8 ? '[&>div]:bg-green-500' :
+                      data.avgConfidence >= 0.6 ? '[&>div]:bg-yellow-500' :
+                      '[&>div]:bg-red-500'
+                    }`}
+                  />
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs text-muted-foreground">Manual Overrides</Label>
+                  <Badge variant="outline" className="text-xs">
+                    {data.manualOverrides} / {data.count}
+                  </Badge>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs text-muted-foreground">Avg Sentiment</Label>
+                  <Badge
+                    className={
+                      data.avgSentiment >= 0.6 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                      data.avgSentiment >= 0.4 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                      'bg-red-100 text-red-700 hover:bg-red-200'
+                    }
+                  >
+                    {(data.avgSentiment * 100).toFixed(1)}%
+                  </Badge>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Avg Confidence:</span>
-                <span className={`font-medium ${
-                  data.avgConfidence > 0.8 ? 'text-green-600' :
-                  data.avgConfidence > 0.6 ? 'text-yellow-600' : 'text-red-600'
-                }`}>
-                  {Math.round(data.avgConfidence * 100)}%
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Manual Overrides:</span>
-                <span className="font-medium">{data.manualOverrides}</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Comparison */}
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Category Performance Comparison</h3>
-          <div className="h-64">
-            <Bar data={categoryComparisonData} options={chartOptions} />
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-xl">📊</span>
+              Category Performance Comparison
+            </CardTitle>
+            <CardDescription>
+              Compare feedback count and AI confidence across categories
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <Bar data={categoryComparisonData} options={chartOptions} />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Sentiment Distribution */}
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Sentiment Distribution {selectedCategory !== 'all' && `- ${formatCategoryName(selectedCategory)}`}
-          </h3>
-          <div className="h-64">
-            <Pie data={sentimentChartData} options={{ responsive: true }} />
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-xl">🎭</span>
+              Sentiment Distribution
+              {selectedCategory !== 'all' && (
+                <Badge variant="outline" className="ml-2">
+                  {formatCategoryName(selectedCategory)}
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {selectedCategory === 'all' ? 'Overall sentiment breakdown across all categories' : `Sentiment analysis for ${formatCategoryName(selectedCategory)}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <Pie data={sentimentChartData} options={{ responsive: true }} />
+            </div>
+            <div className="mt-4 flex justify-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-sm">Positive ({sentimentData.positive})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span className="text-sm">Negative ({sentimentData.negative})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                <span className="text-sm">Neutral ({sentimentData.neutral})</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Top Topics for Selected Category */}
       {selectedCategory !== 'all' && analytics.categories[selectedCategory]?.topTopics?.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow border mb-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Top Topics - {formatCategoryName(selectedCategory)}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {analytics.categories[selectedCategory].topTopics.map(({ topic, count }, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-              >
-                {topic} ({count})
-              </span>
-            ))}
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-xl">🏷️</span>
+              Top Topics - {formatCategoryName(selectedCategory)}
+            </CardTitle>
+            <CardDescription>
+              Most frequently mentioned topics in this category
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {analytics.categories[selectedCategory].topTopics.map(({ topic, count }, index) => (
+                <Badge
+                  key={index}
+                  className="bg-blue-100 text-blue-700 hover:bg-blue-200"
+                >
+                  🔖 {topic} ({count})
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Detailed Category Table */}
-      <div className="bg-white p-6 rounded-lg shadow border">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Detailed Category Breakdown</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Coverage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Confidence</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment Score</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manual Overrides</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Top Topics</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {Object.entries(analytics.categories).map(([category, data]) => (
-                <tr key={category} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {formatCategoryName(category)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {data.count}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {Math.round((data.aiAnalyzed / data.count) * 100)}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      data.avgConfidence > 0.8 ? 'bg-green-100 text-green-800' :
-                      data.avgConfidence > 0.6 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {Math.round(data.avgConfidence * 100)}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {(data.avgSentiment * 100).toFixed(1)}%
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {data.manualOverrides} ({Math.round((data.manualOverrides / data.count) * 100)}%)
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                    <div className="flex flex-wrap gap-1">
-                      {data.topTopics.slice(0, 3).map(({ topic }, index) => (
-                        <span key={index} className="inline-block px-2 py-1 text-xs bg-gray-100 rounded">
-                          {topic}
-                        </span>
-                      ))}
-                      {data.topTopics.length > 3 && (
-                        <span className="text-xs text-gray-400">+{data.topTopics.length - 3} more</span>
-                      )}
-                    </div>
-                  </td>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-xl">📋</span>
+            Detailed Category Breakdown
+          </CardTitle>
+          <CardDescription>
+            Complete analytics overview for all categories
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium">📂 Category</th>
+                  <th className="text-left py-3 px-4 font-medium">📊 Count</th>
+                  <th className="text-left py-3 px-4 font-medium">🤖 AI Coverage</th>
+                  <th className="text-left py-3 px-4 font-medium">🎯 Confidence</th>
+                  <th className="text-left py-3 px-4 font-medium">😊 Sentiment</th>
+                  <th className="text-left py-3 px-4 font-medium">👤 Manual</th>
+                  <th className="text-left py-3 px-4 font-medium">🏷️ Topics</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody>
+                {Object.entries(analytics.categories).map(([category, data]) => (
+                  <tr key={category} className="border-b hover:bg-muted/50 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="font-medium">{formatCategoryName(category)}</div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <Badge variant="outline" className="font-mono">
+                        {data.count}
+                      </Badge>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <Progress
+                          value={(data.aiAnalyzed / data.count) * 100}
+                          className="w-16 h-2 [&>div]:bg-purple-500"
+                        />
+                        <span className="text-sm font-medium text-purple-600">
+                          {Math.round((data.aiAnalyzed / data.count) * 100)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <Badge
+                        className={
+                          data.avgConfidence >= 0.8 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                          data.avgConfidence >= 0.6 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                          'bg-red-100 text-red-700 hover:bg-red-200'
+                        }
+                      >
+                        {Math.round(data.avgConfidence * 100)}%
+                      </Badge>
+                    </td>
+                    <td className="py-4 px-4">
+                      <Badge
+                        className={
+                          data.avgSentiment >= 0.6 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                          data.avgSentiment >= 0.4 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                          'bg-red-100 text-red-700 hover:bg-red-200'
+                        }
+                      >
+                        {(data.avgSentiment * 100).toFixed(1)}%
+                      </Badge>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="text-sm">
+                        <span className="font-medium">{data.manualOverrides}</span>
+                        <span className="text-muted-foreground"> / {data.count}</span>
+                        <div className="text-xs text-muted-foreground">
+                          ({Math.round((data.manualOverrides / data.count) * 100)}%)
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 max-w-xs">
+                      <div className="flex flex-wrap gap-1">
+                        {data.topTopics.slice(0, 2).map(({ topic }, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {topic}
+                          </Badge>
+                        ))}
+                        {data.topTopics.length > 2 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{data.topTopics.length - 2} more
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

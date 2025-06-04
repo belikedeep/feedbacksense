@@ -8,6 +8,11 @@ import FeedbackList from './FeedbackList'
 import Analytics from './Analytics'
 import CategoryAnalytics from './CategoryAnalytics'
 import AIPerformanceMetrics from './AIPerformanceMetrics'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Separator } from '@/components/ui/separator'
 
 export default function Dashboard({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -16,6 +21,17 @@ export default function Dashboard({ user, onSignOut }) {
 
   useEffect(() => {
     initializeUser()
+    
+    // Listen for tab switch events from Analytics empty state
+    const handleTabSwitch = (event) => {
+      setActiveTab(event.detail)
+    }
+    
+    window.addEventListener('switchTab', handleTabSwitch)
+    
+    return () => {
+      window.removeEventListener('switchTab', handleTabSwitch)
+    }
   }, [])
 
   const initializeUser = async () => {
@@ -107,77 +123,68 @@ export default function Dashboard({ user, onSignOut }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-900">FeedbackSense</h1>
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 z-40 w-64 h-screen border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg">
+        <div className="flex h-full flex-col">
+          {/* Logo */}
+          <div className="flex items-center gap-3 border-b px-6 py-5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <span className="text-sm font-bold">FS</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">Welcome, {user?.email || 'User'}</span>
-              
-              {/* User Profile Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => window.location.href = '/dashboard/profile'}
-                  className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span>Profile</span>
-                </button>
-              </div>
-              
-              <button
-                onClick={handleSignOut}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-              >
-                Sign Out
-              </button>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-bold tracking-tight">FeedbackSense</h1>
+              <Badge variant="secondary" className="w-fit text-xs">
+                v2.0
+              </Badge>
             </div>
           </div>
-        </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation */}
-        <div className="flex justify-between items-center mb-8">
-          <nav className="flex space-x-8">
+          {/* Navigation */}
+          <nav className="space-y-2 p-4">
             {[
-              { id: 'dashboard', label: 'Dashboard' },
-              { id: 'add-feedback', label: 'Add Feedback' },
-              { id: 'import-csv', label: 'Import CSV' },
-              { id: 'feedback-list', label: 'All Feedback' },
-              { id: 'category-analytics', label: 'Category Analytics' },
-              { id: 'ai-performance', label: 'AI Performance' },
-            ].map((tab) => (
+              { id: 'dashboard', label: 'Dashboard', icon: '📊', description: 'Analytics overview' },
+              { id: 'add-feedback', label: 'Add Feedback', icon: '➕', description: 'Create new entry' },
+              { id: 'import-csv', label: 'Import CSV', icon: '📁', description: 'Bulk import data' },
+              { id: 'feedback-list', label: 'All Feedback', icon: '📝', description: 'View all entries' },
+              { id: 'category-analytics', label: 'Categories', icon: '📈', description: 'Category insights' },
+              { id: 'ai-performance', label: 'AI Performance', icon: '🤖', description: 'AI metrics' },
+            ].map((item) => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-4 text-sm font-medium rounded-md ${
-                  activeTab === tab.id
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+                  activeTab === item.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground'
                 }`}
               >
-                {tab.label}
+                <span className="text-lg">{item.icon}</span>
+                <div className="flex flex-col">
+                  <span>{item.label}</span>
+                  <span className="text-xs opacity-70">{item.description}</span>
+                </div>
               </button>
             ))}
           </nav>
-          
-          {/* AI Quick Actions */}
-          <div className="flex space-x-3">
-            <button
+
+          <Separator />
+
+          {/* Quick Actions */}
+          <div className="space-y-2 p-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Quick Actions
+            </h3>
+            <Button
               onClick={reanalyzeAllFeedback}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2"
               title="Re-analyze all feedback with AI categorization"
             >
               🤖 Re-analyze All
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 const csvData = feedback.map(f => ({
                   content: f.content,
@@ -197,32 +204,202 @@ export default function Dashboard({ user, onSignOut }) {
                 link.download = 'feedback-category-report.csv'
                 link.click()
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2"
               title="Export category analysis report"
             >
               📊 Export Report
-            </button>
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* User Section - Always Visible */}
+          <div className="border-t p-4 mt-auto">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-medium truncate">
+                  {user?.email || 'User'}
+                </span>
+                <span className="text-xs text-muted-foreground">Online</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/dashboard/profile'}
+                className="w-full justify-start gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                View Profile
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleSignOut}
+                className="w-full justify-start gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
+      </aside>
 
-        {/* Content */}
-        <div className="bg-white rounded-lg shadow p-6">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      {/* Main Content */}
+      <main className="ml-64 flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  {activeTab === 'dashboard' && (
+                    <>
+                      <span className="text-2xl">📊</span>
+                      Dashboard Analytics
+                    </>
+                  )}
+                  {activeTab === 'add-feedback' && (
+                    <>
+                      <span className="text-2xl">➕</span>
+                      Add New Feedback
+                    </>
+                  )}
+                  {activeTab === 'import-csv' && (
+                    <>
+                      <span className="text-2xl">📁</span>
+                      Import CSV Data
+                    </>
+                  )}
+                  {activeTab === 'feedback-list' && (
+                    <>
+                      <span className="text-2xl">📝</span>
+                      All Feedback
+                    </>
+                  )}
+                  {activeTab === 'category-analytics' && (
+                    <>
+                      <span className="text-2xl">📈</span>
+                      Category Analytics
+                    </>
+                  )}
+                  {activeTab === 'ai-performance' && (
+                    <>
+                      <span className="text-2xl">🤖</span>
+                      AI Performance Metrics
+                    </>
+                  )}
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  {activeTab === 'dashboard' && 'Comprehensive insights and performance metrics'}
+                  {activeTab === 'add-feedback' && 'Create a new feedback entry with AI categorization'}
+                  {activeTab === 'import-csv' && 'Bulk import feedback data from CSV files'}
+                  {activeTab === 'feedback-list' && 'View and manage all feedback entries'}
+                  {activeTab === 'category-analytics' && 'Deep dive into category performance'}
+                  {activeTab === 'ai-performance' && 'Monitor AI categorization performance'}
+                </p>
+              </div>
             </div>
-          ) : (
-            <>
-              {activeTab === 'dashboard' && <Analytics feedback={feedback} />}
-              {activeTab === 'add-feedback' && <FeedbackForm onFeedbackAdded={addFeedback} />}
-              {activeTab === 'import-csv' && <CSVImport onFeedbackImported={addBulkFeedback} />}
-              {activeTab === 'feedback-list' && <FeedbackList feedback={feedback} onUpdate={fetchFeedback} />}
-              {activeTab === 'category-analytics' && <CategoryAnalytics feedback={feedback} />}
-              {activeTab === 'ai-performance' && <AIPerformanceMetrics feedback={feedback} />}
-            </>
-          )}
+            <div className="flex items-center gap-4">
+              {feedback.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="gap-1">
+                    <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                    {feedback.length} entries
+                  </Badge>
+                  <Badge variant="secondary" className="gap-1">
+                    <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                    Live
+                  </Badge>
+                </div>
+              )}
+              {activeTab === 'dashboard' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
+                    onClick={fetchFeedback}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-6">
+            {loading ? (
+              <Card>
+                <CardContent className="flex justify-center items-center h-64">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    <p className="text-muted-foreground">Loading dashboard...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && <Analytics feedback={feedback} />}
+                {activeTab === 'add-feedback' && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <FeedbackForm onFeedbackAdded={addFeedback} />
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === 'import-csv' && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <CSVImport onFeedbackImported={addBulkFeedback} />
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === 'feedback-list' && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <FeedbackList feedback={feedback} onUpdate={fetchFeedback} />
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === 'category-analytics' && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <CategoryAnalytics feedback={feedback} />
+                    </CardContent>
+                  </Card>
+                )}
+                {activeTab === 'ai-performance' && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <AIPerformanceMetrics feedback={feedback} />
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

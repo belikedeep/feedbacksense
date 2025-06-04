@@ -5,6 +5,14 @@ import { supabase } from '@/lib/supabase/client'
 import { batchAnalyzeAndCategorizeFeedback } from '@/lib/sentimentAnalysis'
 import { getBatchConfig } from '@/lib/batchConfig'
 import Papa from 'papaparse'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 
 export default function CSVImport({ onFeedbackImported }) {
   const [file, setFile] = useState(null)
@@ -151,149 +159,330 @@ export default function CSVImport({ onFeedbackImported }) {
   }
 
   return (
-    <div className="max-w-4xl">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Import Feedback from CSV</h2>
-      
-      <div className="space-y-6">
-        {/* File Upload */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select CSV File
-          </label>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* File Upload Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-2xl">📁</span>
+                Upload CSV File
+              </CardTitle>
+              <CardDescription>
+                Select a CSV file containing feedback data for bulk import and AI analysis
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-muted-foreground/50 transition-colors">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="text-4xl">📄</div>
+                    <div>
+                      <Label htmlFor="csv-file" className="cursor-pointer">
+                        <Button variant="outline" className="gap-2">
+                          <span>📁</span>
+                          Choose CSV File
+                        </Button>
+                      </Label>
+                      <input
+                        id="csv-file"
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {file ? `Selected: ${file.name}` : 'Click to browse or drag and drop your CSV file here'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Preview and Column Mapping */}
+          {preview && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🗺️</span>
+                  Column Mapping & Preview
+                </CardTitle>
+                <CardDescription>
+                  Map your CSV columns to the appropriate feedback fields
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Column Mapping */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="content-column">
+                      Content Column *
+                      <Badge variant="destructive" className="ml-2 text-xs">Required</Badge>
+                    </Label>
+                    <Select
+                      value={columnMapping.content || "none"}
+                      onValueChange={(value) => setColumnMapping({...columnMapping, content: value === "none" ? "" : value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select content column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select column...</SelectItem>
+                        {preview.meta.fields.map(field => (
+                          <SelectItem key={field} value={field}>{field}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="source-column">
+                      Source Column
+                      <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+                    </Label>
+                    <Select
+                      value={columnMapping.source || "none"}
+                      onValueChange={(value) => setColumnMapping({...columnMapping, source: value === "none" ? "" : value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Skip this field</SelectItem>
+                        {preview.meta.fields.map(field => (
+                          <SelectItem key={field} value={field}>{field}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="category-column">
+                      Category Column
+                      <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+                    </Label>
+                    <Select
+                      value={columnMapping.category || "none"}
+                      onValueChange={(value) => setColumnMapping({...columnMapping, category: value === "none" ? "" : value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Let AI categorize" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">🤖 AI Auto-categorization</SelectItem>
+                        {preview.meta.fields.map(field => (
+                          <SelectItem key={field} value={field}>{field}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="date-column">
+                      Date Column
+                      <Badge variant="secondary" className="ml-2 text-xs">Optional</Badge>
+                    </Label>
+                    <Select
+                      value={columnMapping.date || "none"}
+                      onValueChange={(value) => setColumnMapping({...columnMapping, date: value === "none" ? "" : value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Use current date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Use current date</SelectItem>
+                        {preview.meta.fields.map(field => (
+                          <SelectItem key={field} value={field}>{field}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Preview Table */}
+                <div>
+                  <h4 className="text-sm font-medium mb-3">Data Preview (First 3 rows)</h4>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          {preview.meta.fields.map(field => (
+                            <th key={field} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-r last:border-r-0">
+                              <div className="flex items-center gap-2">
+                                {field}
+                                {columnMapping.content === field && <Badge variant="destructive" className="text-xs">Content</Badge>}
+                                {columnMapping.source === field && <Badge variant="secondary" className="text-xs">Source</Badge>}
+                                {columnMapping.category === field && <Badge variant="secondary" className="text-xs">Category</Badge>}
+                                {columnMapping.date === field && <Badge variant="secondary" className="text-xs">Date</Badge>}
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.data.map((row, idx) => (
+                          <tr key={idx} className="border-t">
+                            {preview.meta.fields.map(field => (
+                              <td key={field} className="px-4 py-3 text-sm border-r last:border-r-0 max-w-[200px] truncate">
+                                {row[field]}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Import Button */}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleImport}
+                    disabled={loading || !columnMapping.content}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        🚀 Import & Analyze
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Status Message */}
+          {message && (
+            <Alert className={message.includes('Error') ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}>
+              <AlertDescription className={message.includes('Error') ? 'text-red-600' : 'text-green-600'}>
+                {message}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
-        {/* Preview and Column Mapping */}
-        {preview && (
-          <div className="border rounded-lg p-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Preview & Column Mapping</h3>
-            
-            {/* Column Mapping */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* AI Processing Info */}
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-900">
+                <span className="text-xl">🤖</span>
+                AI Batch Processing
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Content Column *</label>
-                <select
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  value={columnMapping.content}
-                  onChange={(e) => setColumnMapping({...columnMapping, content: e.target.value})}
-                >
-                  <option value="">Select...</option>
-                  {preview.meta.fields.map(field => (
-                    <option key={field} value={field}>{field}</option>
-                  ))}
-                </select>
+                <h4 className="font-medium text-blue-900 mb-2">What happens during import:</h4>
+                <ul className="space-y-1 text-blue-700">
+                  <li className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-blue-500 rounded-full"></span>
+                    CSV data validation
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-blue-500 rounded-full"></span>
+                    Batch AI analysis (15 items/batch)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-blue-500 rounded-full"></span>
+                    Sentiment classification
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-blue-500 rounded-full"></span>
+                    Auto-categorization
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-blue-500 rounded-full"></span>
+                    Database storage
+                  </li>
+                </ul>
+              </div>
+              <Separator />
+              <div>
+                <Badge variant="secondary" className="text-xs">
+                  ⚡ 10-15x faster than individual processing
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Instructions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">📋</span>
+                CSV Format Guide
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <h4 className="font-medium mb-2">Requirements:</h4>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li>• Header row with column names</li>
+                  <li>• At least one content column</li>
+                  <li>• UTF-8 encoding recommended</li>
+                </ul>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700">Source Column</label>
-                <select
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  value={columnMapping.source}
-                  onChange={(e) => setColumnMapping({...columnMapping, source: e.target.value})}
-                >
-                  <option value="">Select...</option>
-                  {preview.meta.fields.map(field => (
-                    <option key={field} value={field}>{field}</option>
-                  ))}
-                </select>
+                <h4 className="font-medium mb-2">Optional columns:</h4>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li>• Source (email, chat, survey, etc.)</li>
+                  <li>• Category (overrides AI)</li>
+                  <li>• Date (ISO format preferred)</li>
+                </ul>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700">Category Column</label>
-                <select
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  value={columnMapping.category}
-                  onChange={(e) => setColumnMapping({...columnMapping, category: e.target.value})}
-                >
-                  <option value="">Select...</option>
-                  {preview.meta.fields.map(field => (
-                    <option key={field} value={field}>{field}</option>
-                  ))}
-                </select>
+                <h4 className="font-medium mb-2">Example structure:</h4>
+                <div className="bg-muted/50 p-3 rounded text-xs font-mono">
+                  content,source,date<br/>
+                  "Great service!",email,2024-01-01<br/>
+                  "Issue with billing",chat,2024-01-02
+                </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Date Column</label>
-                <select
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  value={columnMapping.date}
-                  onChange={(e) => setColumnMapping({...columnMapping, date: e.target.value})}
-                >
-                  <option value="">Select...</option>
-                  {preview.meta.fields.map(field => (
-                    <option key={field} value={field}>{field}</option>
-                  ))}
-                </select>
+            </CardContent>
+          </Card>
+
+          {/* Performance Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">📊</span>
+                Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Batch size:</span>
+                <Badge variant="outline">15 items</Badge>
               </div>
-            </div>
-
-            {/* Preview Table */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {preview.meta.fields.map(field => (
-                      <th key={field} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {field}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {preview.data.map((row, idx) => (
-                    <tr key={idx}>
-                      {preview.meta.fields.map(field => (
-                        <td key={field} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {row[field]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Import Button */}
-        {preview && (
-          <div>
-            <button
-              onClick={handleImport}
-              disabled={loading || !columnMapping.content}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? 'Processing...' : 'Import Feedback'}
-            </button>
-          </div>
-        )}
-
-        {/* Message */}
-        {message && (
-          <div className={`text-sm ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
-            {message}
-          </div>
-        )}
-
-        {/* Instructions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">CSV Format Instructions:</h4>
-          <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-            <li>The CSV must have a header row with column names</li>
-            <li>At minimum, you need a column containing feedback content</li>
-            <li>Optional columns: source, category, date</li>
-            <li>Example: content,source,category,date</li>
-            <li>🚀 <strong>Batch Processing:</strong> The system processes 15 feedback items per AI request for faster analysis</li>
-            <li>🤖 Each batch is automatically analyzed with AI for categorization and sentiment</li>
-            <li>📊 If you provide a category column, it will override AI suggestions</li>
-            <li>⚡ <strong>Improved Speed:</strong> Large CSV files now process 10-15x faster than before!</li>
-            <li>🎯 <strong>Rate Limit Friendly:</strong> Optimized to stay within free tier API limits</li>
-          </ul>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Processing speed:</span>
+                <Badge variant="outline">~1-2 sec/batch</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Rate limit friendly:</span>
+                <Badge variant="default">✓ Yes</Badge>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
