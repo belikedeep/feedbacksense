@@ -61,48 +61,75 @@ export async function POST(request) {
       }
     }
 
-    // Prepare feedback data for bulk insert with AI fields
-    const feedbackData = feedbacks.map(feedback => ({
-      userId: user.id,
-      content: feedback.content,
-      source: feedback.source || 'csv_import',
-      category: feedback.category || 'general_inquiry',
-      sentimentScore: feedback.sentimentScore || 0.5,
-      sentimentLabel: feedback.sentimentLabel || 'neutral',
-      topics: feedback.topics || [],
-      feedbackDate: feedback.feedbackDate ? new Date(feedback.feedbackDate) : new Date(),
-      // AI categorization fields
-      aiCategoryConfidence: feedback.aiCategoryConfidence || null,
-      aiClassificationMeta: feedback.aiClassificationMeta || null,
-      classificationHistory: feedback.classificationHistory || [],
-      manualOverride: feedback.manualOverride || false
-    }))
+    // Validate and prepare feedback data for bulk insert with AI fields
+    const feedbackData = feedbacks.map((feedback, index) => {
+      // Validate required fields
+      if (!feedback.content || typeof feedback.content !== 'string') {
+        throw new Error(`Invalid content at index ${index}: content is required and must be a string`)
+      }
+
+      // Ensure proper JSON serialization for complex fields
+      let topics, aiClassificationMeta, classificationHistory
+      
+      try {
+        topics = Array.isArray(feedback.topics) ? feedback.topics : []
+        aiClassificationMeta = feedback.aiClassificationMeta ?
+          (typeof feedback.aiClassificationMeta === 'object' ? feedback.aiClassificationMeta : JSON.parse(feedback.aiClassificationMeta)) : null
+        classificationHistory = Array.isArray(feedback.classificationHistory) ? feedback.classificationHistory : []
+      } catch (jsonError) {
+        console.warn(`JSON parsing error for feedback at index ${index}:`, jsonError)
+        topics = []
+        aiClassificationMeta = null
+        classificationHistory = []
+      }
+
+      return {
+        userId: user.id,
+        content: feedback.content.trim(),
+        source: feedback.source || 'csv_import',
+        category: feedback.category || 'general_inquiry',
+        sentimentScore: typeof feedback.sentimentScore === 'number' ? feedback.sentimentScore : 0.5,
+        sentimentLabel: feedback.sentimentLabel || 'neutral',
+        topics,
+        feedbackDate: feedback.feedbackDate ? new Date(feedback.feedbackDate) : new Date(),
+        // AI categorization fields
+        aiCategoryConfidence: typeof feedback.aiCategoryConfidence === 'number' ? feedback.aiCategoryConfidence : null,
+        aiClassificationMeta,
+        classificationHistory,
+        manualOverride: Boolean(feedback.manualOverride)
+      }
+    })
 
     // Count how many have AI analysis
     const aiAnalyzedCount = feedbacks.filter(f => f.aiCategoryConfidence !== null && f.aiCategoryConfidence !== undefined).length
 
-    // Bulk insert feedback
-    const createdFeedbacks = await prisma.feedback.createMany({
-      data: feedbackData,
-      skipDuplicates: true
+    // Use transaction for atomic operation
+    const result = await prisma.$transaction(async (tx) => {
+      // Bulk insert feedback
+      const createdFeedbacks = await tx.feedback.createMany({
+        data: feedbackData,
+        skipDuplicates: true
+      })
+
+      // Fetch the created feedbacks to return them
+      const insertedFeedbacks = await tx.feedback.findMany({
+        where: {
+          userId: user.id
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: feedbackData.length
+      })
+
+      return {
+        count: createdFeedbacks.count,
+        aiAnalyzed: aiAnalyzedCount,
+        feedbacks: insertedFeedbacks
+      }
     })
 
-    // Fetch the created feedbacks to return them
-    const result = await prisma.feedback.findMany({
-      where: {
-        userId: user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: feedbacks.length
-    })
-
-    return NextResponse.json({
-      count: createdFeedbacks.count,
-      aiAnalyzed: aiAnalyzedCount,
-      feedbacks: result
-    })
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error bulk creating feedback:', error)
     return NextResponse.json({ error: 'Failed to bulk create feedback' }, { status: 500 })
