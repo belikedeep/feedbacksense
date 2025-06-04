@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { getAIPerformanceMetrics } from '@/lib/geminiAI'
+import { Bar, Line, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,8 +15,6 @@ import {
   PointElement,
   LineElement,
 } from 'chart.js'
-import { Bar, Line, Doughnut } from 'react-chartjs-2'
-import { format, isWithinInterval, subDays, startOfDay, endOfDay, subHours } from 'date-fns'
 
 ChartJS.register(
   CategoryScale,
@@ -29,196 +29,139 @@ ChartJS.register(
 )
 
 export default function AIPerformanceMetrics({ feedback }) {
-  const [systemHealth, setSystemHealth] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
-    fetchSystemHealth()
-  }, [])
+    loadMetrics()
+  }, [feedback])
 
-  const fetchSystemHealth = async () => {
+  const loadMetrics = async () => {
     try {
-      const response = await fetch('/api/health')
-      if (response.ok) {
-        const healthData = await response.json()
-        setSystemHealth(healthData)
-      }
+      setIsLoading(true)
+      const performanceMetrics = await getAIPerformanceMetrics()
+      setMetrics(performanceMetrics)
     } catch (error) {
-      console.error('Error fetching system health:', error)
+      console.error('Error loading AI performance metrics:', error)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const aiMetrics = useMemo(() => {
-    if (!feedback || feedback.length === 0) {
-      return {
-        totalProcessed: 0,
-        aiAnalyzed: 0,
-        averageConfidence: 0,
-        confidenceDistribution: { high: 0, medium: 0, low: 0 },
-        processingTimes: [],
-        errorRate: 0,
-        manualOverrideRate: 0,
-        categoryAccuracy: {},
-        recentPerformance: [],
-        aiUsageByHour: {},
-        fallbackUsage: 0
-      }
-    }
-
-    const aiAnalyzedFeedback = feedback.filter(f => f.aiCategoryConfidence !== null && f.aiCategoryConfidence !== undefined)
-    const totalProcessed = feedback.length
-    const aiAnalyzed = aiAnalyzedFeedback.length
-
-    // Confidence statistics
-    const averageConfidence = aiAnalyzed > 0 
-      ? aiAnalyzedFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / aiAnalyzed
-      : 0
-
-    const confidenceDistribution = aiAnalyzedFeedback.reduce((acc, f) => {
+  const calculateConfidenceDistribution = () => {
+    if (!feedback || feedback.length === 0) return { high: 0, medium: 0, low: 0 }
+    
+    const aiAnalyzedFeedback = feedback.filter(f => f.aiCategoryConfidence !== null)
+    return aiAnalyzedFeedback.reduce((acc, f) => {
       const confidence = parseFloat(f.aiCategoryConfidence || 0)
-      if (confidence > 0.8) acc.high++
-      else if (confidence > 0.5) acc.medium++
+      if (confidence >= 0.8) acc.high++
+      else if (confidence >= 0.6) acc.medium++
       else acc.low++
       return acc
     }, { high: 0, medium: 0, low: 0 })
+  }
 
-    // Processing performance over last 7 days
-    const last7Days = subDays(new Date(), 7)
-    const recentFeedback = feedback.filter(f => 
-      isWithinInterval(new Date(f.createdAt || f.created_at || f.feedbackDate), {
-        start: startOfDay(last7Days),
-        end: endOfDay(new Date())
-      })
-    )
-
-    const recentPerformance = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), 6 - i)
-      const dateStr = format(date, 'yyyy-MM-dd')
-      const dayFeedback = recentFeedback.filter(f => {
-        const feedbackDate = f.createdAt || f.created_at || f.feedbackDate
-        return format(new Date(feedbackDate), 'yyyy-MM-dd') === dateStr
-      })
-      
-      const dayAIFeedback = dayFeedback.filter(f => f.aiCategoryConfidence !== null)
-      
-      return {
-        date: dateStr,
-        processed: dayFeedback.length,
-        aiAnalyzed: dayAIFeedback.length,
-        avgConfidence: dayAIFeedback.length > 0 
-          ? dayAIFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / dayAIFeedback.length
-          : 0,
-        manualOverrides: dayFeedback.filter(f => f.manualOverride).length
-      }
-    })
-
-    // AI usage by hour (simulated based on creation times)
-    const aiUsageByHour = recentFeedback.reduce((acc, f) => {
-      const hour = new Date(f.createdAt || f.created_at || f.feedbackDate).getHours()
-      acc[hour] = (acc[hour] || 0) + 1
+  const calculateMethodDistribution = () => {
+    if (!feedback || feedback.length === 0) return {}
+    
+    return feedback.reduce((acc, f) => {
+      const method = f.method || 'unknown'
+      acc[method] = (acc[method] || 0) + 1
       return acc
     }, {})
+  }
 
-    // Category accuracy (how often AI categories match manual overrides)
-    const categoryAccuracy = {}
-    const categoriesWithOverrides = feedback.filter(f => f.manualOverride && f.classificationHistory)
+  const calculateCategoryAccuracy = () => {
+    if (!feedback || feedback.length === 0) return {}
     
-    categoriesWithOverrides.forEach(f => {
-      if (f.classificationHistory && f.classificationHistory.length > 1) {
-        const history = Array.isArray(f.classificationHistory) ? f.classificationHistory : JSON.parse(f.classificationHistory || '[]')
-        const aiCategory = history.find(h => h.method === 'AI')?.category
-        const manualCategory = f.category
-        
-        if (aiCategory) {
-          if (!categoryAccuracy[aiCategory]) {
-            categoryAccuracy[aiCategory] = { correct: 0, total: 0 }
+    const categoryStats = {}
+    feedback.forEach(f => {
+      if (f.category && f.aiCategoryConfidence !== null) {
+        if (!categoryStats[f.category]) {
+          categoryStats[f.category] = {
+            total: 0,
+            highConfidence: 0,
+            avgConfidence: 0,
+            confidenceSum: 0
           }
-          categoryAccuracy[aiCategory].total++
-          if (aiCategory === manualCategory) {
-            categoryAccuracy[aiCategory].correct++
-          }
+        }
+        categoryStats[f.category].total++
+        categoryStats[f.category].confidenceSum += parseFloat(f.aiCategoryConfidence || 0)
+        if (parseFloat(f.aiCategoryConfidence || 0) >= 0.8) {
+          categoryStats[f.category].highConfidence++
         }
       }
     })
+    
+    Object.keys(categoryStats).forEach(category => {
+      categoryStats[category].avgConfidence = 
+        categoryStats[category].confidenceSum / categoryStats[category].total
+    })
+    
+    return categoryStats
+  }
 
-    // Calculate rates
-    const manualOverrideRate = (feedback.filter(f => f.manualOverride).length / totalProcessed) * 100
-    const errorRate = Math.max(0, 100 - averageConfidence * 100) // Simplified error rate based on confidence
-    const fallbackUsage = ((totalProcessed - aiAnalyzed) / totalProcessed) * 100
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow border p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+          <div className="space-y-2">
+            <div className="h-3 bg-gray-200 rounded"></div>
+            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-    return {
-      totalProcessed,
-      aiAnalyzed,
-      averageConfidence,
-      confidenceDistribution,
-      recentPerformance,
-      aiUsageByHour,
-      categoryAccuracy,
-      manualOverrideRate,
-      errorRate,
-      fallbackUsage
-    }
-  }, [feedback])
+  const confidenceDistribution = calculateConfidenceDistribution()
+  const methodDistribution = calculateMethodDistribution()
+  const categoryAccuracy = calculateCategoryAccuracy()
 
   // Chart data
-  const performanceTrendData = {
-    labels: aiMetrics.recentPerformance.map(d => format(new Date(d.date), 'MMM dd')),
+  const confidenceChartData = {
+    labels: ['High (≥80%)', 'Medium (60-79%)', 'Low (<60%)'],
     datasets: [
       {
-        label: 'Total Processed',
-        data: aiMetrics.recentPerformance.map(d => d.processed),
-        borderColor: '#3B82F6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.1,
-      },
-      {
-        label: 'AI Analyzed',
-        data: aiMetrics.recentPerformance.map(d => d.aiAnalyzed),
-        borderColor: '#10B981',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.1,
-      },
-    ],
-  }
-
-  const confidenceTrendData = {
-    labels: aiMetrics.recentPerformance.map(d => format(new Date(d.date), 'MMM dd')),
-    datasets: [
-      {
-        label: 'Average Confidence (%)',
-        data: aiMetrics.recentPerformance.map(d => d.avgConfidence * 100),
-        borderColor: '#8B5CF6',
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        tension: 0.1,
-      },
-    ],
-  }
-
-  const usageByHourData = {
-    labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
-    datasets: [
-      {
-        label: 'Feedback Processed',
-        data: Array.from({ length: 24 }, (_, i) => aiMetrics.aiUsageByHour[i] || 0),
-        backgroundColor: '#F59E0B',
-        borderColor: '#D97706',
+        data: [confidenceDistribution.high, confidenceDistribution.medium, confidenceDistribution.low],
+        backgroundColor: ['#10B981', '#F59E0B', '#EF4444'],
         borderWidth: 1,
       },
     ],
   }
 
-  const confidenceDistData = {
-    labels: ['High (>80%)', 'Medium (50-80%)', 'Low (<50%)'],
+  const methodChartData = {
+    labels: Object.keys(methodDistribution).map(method => {
+      switch (method) {
+        case 'ai_enhanced': return 'AI Enhanced'
+        case 'ai_batch_enhanced': return 'AI Batch'
+        case 'fallback_enhanced': return 'Keyword Fallback'
+        default: return method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }
+    }),
     datasets: [
       {
-        data: [
-          aiMetrics.confidenceDistribution.high,
-          aiMetrics.confidenceDistribution.medium,
-          aiMetrics.confidenceDistribution.low
-        ],
-        backgroundColor: ['#10B981', '#F59E0B', '#EF4444'],
+        label: 'Number of Classifications',
+        data: Object.values(methodDistribution),
+        backgroundColor: '#3B82F6',
+        borderColor: '#2563EB',
+        borderWidth: 1,
+      },
+    ],
+  }
+
+  const categoryAccuracyData = {
+    labels: Object.keys(categoryAccuracy).map(cat => 
+      cat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    ),
+    datasets: [
+      {
+        label: 'Average Confidence (%)',
+        data: Object.values(categoryAccuracy).map(stat => stat.avgConfidence * 100),
+        backgroundColor: '#8B5CF6',
+        borderColor: '#7C3AED',
         borderWidth: 1,
       },
     ],
@@ -231,271 +174,200 @@ export default function AIPerformanceMetrics({ feedback }) {
         position: 'top',
       },
     },
-  }
-
-  const getHealthStatusColor = (status) => {
-    switch (status) {
-      case 'healthy': return 'text-green-600 bg-green-50 border-green-200'
-      case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-      case 'error': return 'text-red-600 bg-red-50 border-red-200'
-      default: return 'text-gray-600 bg-gray-50 border-gray-200'
+    scales: {
+      y: {
+        beginAtZero: true
+      }
     }
   }
 
-  const getRecommendations = () => {
-    const recommendations = []
-    
-    if (aiMetrics.averageConfidence < 0.7) {
-      recommendations.push({
-        type: 'warning',
-        message: 'Average AI confidence is below 70%. Consider reviewing and improving training data.'
-      })
-    }
-    
-    if (aiMetrics.manualOverrideRate > 20) {
-      recommendations.push({
-        type: 'warning',
-        message: `Manual override rate is ${aiMetrics.manualOverrideRate.toFixed(1)}%. High override rate may indicate AI model needs retraining.`
-      })
-    }
-    
-    if (aiMetrics.fallbackUsage > 30) {
-      recommendations.push({
-        type: 'error',
-        message: `${aiMetrics.fallbackUsage.toFixed(1)}% of feedback is not being AI-analyzed. Check AI service connectivity.`
-      })
-    }
-    
-    if (aiMetrics.confidenceDistribution.low / aiMetrics.aiAnalyzed > 0.3) {
-      recommendations.push({
-        type: 'warning',
-        message: 'Over 30% of AI categorizations have low confidence. Consider expanding training data for underperforming categories.'
-      })
-    }
-
-    if (recommendations.length === 0) {
-      recommendations.push({
-        type: 'success',
-        message: 'AI system is performing well! All metrics are within acceptable ranges.'
-      })
-    }
-    
-    return recommendations
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+  const formatCategoryName = (category) => {
+    return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">AI Performance Metrics</h2>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">AI Performance Metrics</h2>
+          <p className="text-gray-500 mt-1">Analytics and insights about AI categorization performance</p>
+        </div>
         <button
-          onClick={fetchSystemHealth}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          onClick={() => setShowDetails(!showDetails)}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          🔄 Refresh
+          {showDetails ? 'Hide Details' : 'Show Details'}
         </button>
       </div>
 
-      {/* System Health Overview */}
-      {systemHealth && (
-        <div className="bg-white p-6 rounded-lg shadow border mb-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">System Health Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className={`p-4 rounded-lg border ${getHealthStatusColor(systemHealth.database?.status)}`}>
-              <div className="flex items-center">
-                <span className="text-lg font-semibold">Database</span>
-                <span className="ml-2">{systemHealth.database?.status === 'healthy' ? '✅' : '⚠️'}</span>
-              </div>
-              <p className="text-sm mt-1">{systemHealth.database?.message}</p>
-            </div>
-            <div className={`p-4 rounded-lg border ${getHealthStatusColor(systemHealth.geminiAI?.status)}`}>
-              <div className="flex items-center">
-                <span className="text-lg font-semibold">Gemini AI</span>
-                <span className="ml-2">{systemHealth.geminiAI?.status === 'healthy' ? '✅' : '⚠️'}</span>
-              </div>
-              <p className="text-sm mt-1">{systemHealth.geminiAI?.message}</p>
-            </div>
-            <div className={`p-4 rounded-lg border ${getHealthStatusColor(systemHealth.overall?.status)}`}>
-              <div className="flex items-center">
-                <span className="text-lg font-semibold">Overall</span>
-                <span className="ml-2">{systemHealth.overall?.status === 'healthy' ? '✅' : '⚠️'}</span>
-              </div>
-              <p className="text-sm mt-1">System {systemHealth.overall?.status}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Key Performance Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow border">
+      {/* Key Performance Indicators */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow border border-blue-200">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm font-medium">📊</span>
+                <span className="text-white text-sm font-medium">🤖</span>
               </div>
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">AI Coverage</dt>
+                <dt className="text-sm font-medium text-gray-500 truncate">Total AI Feedback</dt>
+                <dd className="text-lg font-medium text-gray-900">{metrics?.totalFeedback || 0}</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg shadow border border-green-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                <span className="text-white text-sm font-medium">✓</span>
+              </div>
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">Accuracy Rate</dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {aiMetrics.totalProcessed > 0 ? Math.round((aiMetrics.aiAnalyzed / aiMetrics.totalProcessed) * 100) : 0}%
+                  {metrics?.totalFeedback > 0 ? Math.round(metrics.accuracy * 100) : 0}%
                 </dd>
               </dl>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-6 rounded-lg shadow border border-purple-200">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm font-medium">🎯</span>
+              <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                <span className="text-white text-sm font-medium">📊</span>
               </div>
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">Avg Confidence</dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {Math.round(aiMetrics.averageConfidence * 100)}%
+                  {Math.round((metrics?.averageConfidence || 0) * 100)}%
                 </dd>
               </dl>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-lg shadow border border-orange-200">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm font-medium">✋</span>
+                <span className="text-white text-sm font-medium">💡</span>
               </div>
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Override Rate</dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {aiMetrics.manualOverrideRate.toFixed(1)}%
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm font-medium">⚠️</span>
-              </div>
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Fallback Usage</dt>
-                <dd className="text-lg font-medium text-gray-900">
-                  {aiMetrics.fallbackUsage.toFixed(1)}%
-                </dd>
+                <dt className="text-sm font-medium text-gray-500 truncate">Correct Predictions</dt>
+                <dd className="text-lg font-medium text-gray-900">{metrics?.correctPredictions || 0}</dd>
               </dl>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Processing Trend */}
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Processing Trend (Last 7 Days)</h3>
-          <div className="h-64">
-            <Line data={performanceTrendData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Confidence Trend */}
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Confidence Trend</h3>
-          <div className="h-64">
-            <Line data={confidenceTrendData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Usage by Hour */}
-        <div className="bg-white p-6 rounded-lg shadow border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Processing by Hour</h3>
-          <div className="h-64">
-            <Bar data={usageByHourData} options={chartOptions} />
-          </div>
-        </div>
-
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Confidence Distribution */}
         <div className="bg-white p-6 rounded-lg shadow border">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Confidence Distribution</h3>
           <div className="h-64">
-            <Doughnut data={confidenceDistData} options={{ responsive: true }} />
+            <Doughnut data={confidenceChartData} options={chartOptions} />
+          </div>
+        </div>
+
+        {/* Classification Methods */}
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Classification Methods</h3>
+          <div className="h-64">
+            <Bar data={methodChartData} options={chartOptions} />
+          </div>
+        </div>
+
+        {/* Category Performance */}
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Category Performance</h3>
+          <div className="h-64">
+            <Bar data={categoryAccuracyData} options={chartOptions} />
           </div>
         </div>
       </div>
 
-      {/* Category Accuracy */}
-      {Object.keys(aiMetrics.categoryAccuracy).length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow border mb-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Category Accuracy (Based on Manual Overrides)</h3>
-          <div className="space-y-3">
-            {Object.entries(aiMetrics.categoryAccuracy).map(([category, accuracy]) => {
-              const percentage = (accuracy.correct / accuracy.total) * 100
-              return (
-                <div key={category} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-900 capitalize">
-                    {category.replace(/_/g, ' ')}
-                  </span>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${percentage >= 80 ? 'bg-green-600' : percentage >= 60 ? 'bg-yellow-600' : 'bg-red-600'}`}
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {accuracy.correct}/{accuracy.total} ({percentage.toFixed(1)}%)
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+      {/* Improvement Suggestions */}
+      {metrics?.improvementSuggestions && metrics.improvementSuggestions.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+          <h3 className="text-lg font-medium text-amber-800 mb-3">💡 AI Improvement Suggestions</h3>
+          <ul className="space-y-2">
+            {metrics.improvementSuggestions.map((suggestion, index) => (
+              <li key={index} className="flex items-start">
+                <span className="text-amber-600 mr-2">•</span>
+                <span className="text-amber-700">{suggestion}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      {/* Recommendations */}
-      <div className="bg-white p-6 rounded-lg shadow border">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Recommendations</h3>
-        <div className="space-y-3">
-          {getRecommendations().map((rec, index) => (
-            <div 
-              key={index}
-              className={`p-4 rounded-lg border ${
-                rec.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-                rec.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-                'bg-red-50 border-red-200 text-red-800'
-              }`}
-            >
-              <div className="flex items-start">
-                <span className="mr-2">
-                  {rec.type === 'success' ? '✅' : rec.type === 'warning' ? '⚠️' : '🚨'}
-                </span>
-                <p className="text-sm">{rec.message}</p>
-              </div>
-            </div>
-          ))}
+      {/* Detailed Analytics */}
+      {showDetails && (
+        <div className="bg-white rounded-lg shadow border">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Detailed Category Analytics</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Items</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Confidence</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">High Confidence</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Success Rate</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {Object.entries(categoryAccuracy).map(([category, stats]) => (
+                  <tr key={category} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatCategoryName(category)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stats.total}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          stats.avgConfidence > 0.8 ? 'bg-green-100 text-green-800' :
+                          stats.avgConfidence > 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {Math.round(stats.avgConfidence * 100)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stats.highConfidence} / {stats.total} ({Math.round((stats.highConfidence / stats.total) * 100)}%)
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full" 
+                          style={{ width: `${(stats.highConfidence / stats.total) * 100}%` }}
+                        ></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import AdvancedSearchPanel from './AdvancedSearchPanel'
+import BulkRecategorization from './BulkRecategorization'
+import { recordUserFeedback } from '@/lib/geminiAI'
 
 export default function FeedbackList({ feedback, onUpdate }) {
   const [filteredFeedback, setFilteredFeedback] = useState(feedback)
@@ -10,6 +12,8 @@ export default function FeedbackList({ feedback, onUpdate }) {
   const [editingCategory, setEditingCategory] = useState(null)
   const [newCategory, setNewCategory] = useState('')
   const [updatingFeedback, setUpdatingFeedback] = useState(null)
+  const [showBulkPanel, setShowBulkPanel] = useState(false)
+  const [viewMode, setViewMode] = useState('list') // 'list' or 'bulk'
 
   const handleFilteredResults = (results) => {
     setFilteredFeedback(results)
@@ -51,16 +55,34 @@ export default function FeedbackList({ feedback, onUpdate }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error('User not authenticated')
 
+      // Find the original feedback item to record user feedback
+      const originalItem = feedback.find(item => item.id === id)
+      const originalAICategory = originalItem?.category
+      const originalAIConfidence = originalItem?.aiCategoryConfidence
+
       const response = await fetch(`/api/feedback/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ category })
+        body: JSON.stringify({
+          category,
+          manualOverride: true // Mark as manually categorized
+        })
       })
       
       if (!response.ok) throw new Error('Failed to update feedback')
+      
+      // Record user feedback for AI improvement if this was an AI categorization
+      if (originalAICategory && originalAIConfidence !== null) {
+        recordUserFeedback(
+          originalItem.content,
+          originalAICategory,
+          category,
+          originalAIConfidence
+        )
+      }
       
       setEditingCategory(null)
       setNewCategory('')
@@ -148,17 +170,54 @@ export default function FeedbackList({ feedback, onUpdate }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">All Feedback</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">All Feedback</h2>
+        
+        {/* View Mode Toggle */}
+        <div className="flex items-center space-x-4">
+          <div className="flex rounded-md shadow-sm" role="group">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 text-sm font-medium border ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              } rounded-l-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              📝 List View
+            </button>
+            <button
+              onClick={() => setViewMode('bulk')}
+              className={`px-4 py-2 text-sm font-medium border-t border-r border-b ${
+                viewMode === 'bulk'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              } rounded-r-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              🔄 Bulk Actions
+            </button>
+          </div>
+        </div>
+      </div>
       
-      {/* Advanced Search Panel */}
-      <AdvancedSearchPanel
-        feedback={feedback}
-        onFilteredResults={handleFilteredResults}
-        onFiltersChange={handleFiltersChange}
-      />
+      {/* Advanced Search Panel - Show in both modes */}
+      {viewMode === 'list' && (
+        <AdvancedSearchPanel
+          feedback={feedback}
+          onFilteredResults={handleFilteredResults}
+          onFiltersChange={handleFiltersChange}
+        />
+      )}
 
-      {/* Feedback List */}
-      <div className="space-y-4">
+      {/* Conditional Content Based on View Mode */}
+      {viewMode === 'bulk' ? (
+        <BulkRecategorization
+          feedback={filteredFeedback.length > 0 ? filteredFeedback : feedback}
+          onUpdate={onUpdate}
+        />
+      ) : (
+        /* Feedback List */
+        <div className="space-y-4">
         {filteredFeedback.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500">No feedback found matching your filters.</p>
@@ -218,11 +277,23 @@ export default function FeedbackList({ feedback, onUpdate }) {
                           {formatCategoryName(item.category)}
                         </span>
                         
-                        {/* AI Confidence Badge */}
+                        {/* Enhanced AI Confidence Badge */}
                         {item.aiCategoryConfidence !== null && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getConfidenceColor(item.aiCategoryConfidence)}`}>
-                            {getConfidenceIcon(item.aiCategoryConfidence)} AI: {getConfidenceLabel(item.aiCategoryConfidence)} ({Math.round(item.aiCategoryConfidence * 100)}%)
-                          </span>
+                          <div className="flex items-center space-x-1">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getConfidenceColor(item.aiCategoryConfidence)}`}>
+                              {getConfidenceIcon(item.aiCategoryConfidence)} AI: {getConfidenceLabel(item.aiCategoryConfidence)} ({Math.round(item.aiCategoryConfidence * 100)}%)
+                            </span>
+                            {item.method && (
+                              <span className="text-xs text-gray-400" title={`Classification method: ${item.method}`}>
+                                {item.method === 'ai_enhanced' ? '🤖' : item.method === 'fallback_enhanced' ? '🔤' : '📊'}
+                              </span>
+                            )}
+                            {item.keyIndicators && item.keyIndicators.length > 0 && (
+                              <span className="text-xs text-gray-400" title={`Key indicators: ${item.keyIndicators.join(', ')}`}>
+                                🔍
+                              </span>
+                            )}
+                          </div>
                         )}
                         
                         {/* Manual Override Indicator */}
@@ -332,7 +403,8 @@ export default function FeedbackList({ feedback, onUpdate }) {
             </div>
           ))
         )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
