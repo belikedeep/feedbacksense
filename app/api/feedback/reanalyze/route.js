@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
-import { reanalyzeFeedback } from '@/lib/sentimentAnalysis'
+import { batchReanalyzeFeedback } from '@/lib/sentimentAnalysis'
+import { getBatchConfig } from '@/lib/batchConfig'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,12 +40,15 @@ export async function POST(request) {
       // Continue with empty body for backward compatibility
     }
 
+    // Get optimal batch configuration for reanalysis
+    const batchConfig = getBatchConfig('reanalysis')
+    
     const {
       categories = [],
       sources = [],
       dateFrom = null,
       dateTo = null,
-      batchSize = 10
+      batchSize = batchConfig.batchSize
     } = body
 
     // Build where clause based on filters
@@ -82,7 +86,7 @@ export async function POST(request) {
       })
     }
 
-    // Process in batches to avoid overwhelming the AI service
+    // Process using efficient batch analysis
     const results = {
       total: feedback.length,
       processed: 0,
@@ -90,22 +94,34 @@ export async function POST(request) {
       errors: []
     }
 
-    for (let i = 0; i < feedback.length; i += batchSize) {
-      const batch = feedback.slice(i, i + batchSize)
-      
-      const batchPromises = batch.map(async (f) => {
-        try {
-          // Get existing classification history
-          const existingHistory = Array.isArray(f.classificationHistory)
-            ? f.classificationHistory
-            : []
+    console.log(`🚀 Starting optimized batch re-analysis: ${feedback.length} items using ${batchConfig.description} (batch size: ${batchSize})`)
 
-          // Re-analyze with AI
-          const analysis = await reanalyzeFeedback(f.content, existingHistory)
-          
-          // Update feedback with new AI analysis
+    try {
+      // Prepare feedback items for batch processing
+      const feedbackItems = feedback.map(f => ({
+        id: f.id,
+        content: f.content,
+        classificationHistory: Array.isArray(f.classificationHistory)
+          ? f.classificationHistory
+          : []
+      }))
+
+      // Use batch re-analysis function with progress tracking
+      const analysisResults = await batchReanalyzeFeedback(
+        feedbackItems,
+        batchSize,
+        (progress) => {
+          console.log(`Batch progress: ${progress.processed}/${progress.total} (${progress.percentage}%) - Batch ${progress.batchesCompleted}/${progress.totalBatches}`)
+        }
+      )
+
+      console.log(`Batch analysis complete. Updating ${analysisResults.length} feedback records in database...`)
+
+      // Update all feedback records in the database
+      const updatePromises = analysisResults.map(async (analysis) => {
+        try {
           const updatedFeedback = await prisma.feedback.update({
-            where: { id: f.id },
+            where: { id: analysis.id },
             data: {
               category: analysis.aiCategory,
               sentimentScore: analysis.sentimentScore,
@@ -120,24 +136,26 @@ export async function POST(request) {
 
           results.processed++
           return updatedFeedback
-        } catch (analysisError) {
-          console.error(`Failed to re-analyze feedback ${f.id}:`, analysisError)
+        } catch (updateError) {
+          console.error(`Failed to update feedback ${analysis.id}:`, updateError)
           results.failed++
           results.errors.push({
-            feedbackId: f.id,
-            error: analysisError.message
+            feedbackId: analysis.id,
+            error: updateError.message
           })
           return null
         }
       })
 
-      // Wait for batch to complete before processing next batch
-      await Promise.all(batchPromises)
-      
-      // Add small delay between batches to be respectful to AI service
-      if (i + batchSize < feedback.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
+      // Wait for all database updates to complete
+      await Promise.all(updatePromises)
+
+    } catch (batchError) {
+      console.error('Batch re-analysis failed:', batchError)
+      results.failed = feedback.length
+      results.errors.push({
+        error: `Batch processing failed: ${batchError.message}`
+      })
     }
 
     console.log(`Re-analysis complete: ${results.processed} processed, ${results.failed} failed`)
