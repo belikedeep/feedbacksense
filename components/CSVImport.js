@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { track } from '@vercel/analytics'
 
 export default function CSVImport({ onFeedbackImported }) {
   const [file, setFile] = useState(null)
@@ -48,6 +49,12 @@ export default function CSVImport({ onFeedbackImported }) {
       setFile(selectedFile)
       setMessage('')
       
+      // Track CSV file selection
+      track('csv_file_selected', {
+        fileSize: selectedFile.size,
+        fileName: selectedFile.name
+      })
+      
       console.log('Parsing CSV file for preview...');
       
       // First, parse the entire file to get total row count
@@ -59,6 +66,13 @@ export default function CSVImport({ onFeedbackImported }) {
           const actualRowCount = fullResults.data.length;
           const limitedRowCount = Math.min(actualRowCount, 100);
           setTotalRows(limitedRowCount);
+          
+          // Track CSV parsing and row count
+          track('csv_parsed', {
+            totalRows: actualRowCount,
+            limitedRows: limitedRowCount,
+            wasLimited: actualRowCount > 100
+          })
           
           // Show warning if file has more than 100 rows
           if (actualRowCount > 100) {
@@ -226,6 +240,15 @@ export default function CSVImport({ onFeedbackImported }) {
                 
                 const result = await response.json()
 
+                // Track successful import
+                track('csv_import_success', {
+                  importedCount: result.count,
+                  totalRows: feedbacks.length,
+                  hadSourceMapping: !!columnMapping.source,
+                  hadCategoryMapping: !!columnMapping.category,
+                  hadDateMapping: !!columnMapping.date
+                })
+                
                 setMessage(`🎉 Successfully imported ${result.count} feedback entries with AI batch analysis! All entries were processed efficiently using batch processing.`)
                 if (onFeedbackImported) {
                   onFeedbackImported(result.feedbacks)
@@ -236,6 +259,14 @@ export default function CSVImport({ onFeedbackImported }) {
                 setColumnMapping({ content: '', source: '', category: '', date: '' })
               } catch (saveError) {
                 console.error('Database save error:', saveError)
+                
+                // Track import failure
+                track('csv_import_error', {
+                  error: 'database_save_failed',
+                  message: saveError.message,
+                  rowCount: feedbacks.length
+                })
+                
                 setMessage(`Error saving to database: ${saveError.message}. Your data was analyzed but not saved.`)
               }
             } else {
@@ -244,6 +275,14 @@ export default function CSVImport({ onFeedbackImported }) {
             
           } catch (batchAnalysisError) {
             console.error('Batch analysis failed:', batchAnalysisError)
+            
+            // Track analysis failure
+            track('csv_analysis_error', {
+              error: 'batch_analysis_failed',
+              message: batchAnalysisError.message,
+              rowCount: validRows.length
+            })
+            
             setMessage(`Error during batch analysis: ${batchAnalysisError.message}. Please try with a smaller file.`)
           }
           
