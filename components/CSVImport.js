@@ -56,7 +56,14 @@ export default function CSVImport({ onFeedbackImported }) {
         skipEmptyLines: true,
         complete: (fullResults) => {
           console.log('Full CSV parsed for count:', fullResults.data.length, 'rows');
-          setTotalRows(fullResults.data.length);
+          const actualRowCount = fullResults.data.length;
+          const limitedRowCount = Math.min(actualRowCount, 100);
+          setTotalRows(limitedRowCount);
+          
+          // Show warning if file has more than 100 rows
+          if (actualRowCount > 100) {
+            setMessage(`Note: CSV contains ${actualRowCount} rows, but only the first 100 rows will be processed due to current limit.`);
+          }
           
           // Then parse just first few rows for preview
           Papa.parse(selectedFile, {
@@ -133,10 +140,18 @@ export default function CSVImport({ onFeedbackImported }) {
               return;
             }
           }
-          // Extract and validate feedback content
-          const validRows = results.data.filter(row =>
+          // Extract and validate feedback content, limit to 100 rows
+          const allValidRows = results.data.filter(row =>
             row[columnMapping.content] && row[columnMapping.content].trim()
           );
+          
+          // Apply 100 row limit
+          const validRows = allValidRows.slice(0, 100);
+          
+          // Show info about row limitation
+          if (allValidRows.length > 100) {
+            console.log(`Limiting processing from ${allValidRows.length} to 100 rows`);
+          }
           
           if (validRows.length === 0) {
             setMessage('No valid feedback content found in the CSV file')
@@ -307,7 +322,7 @@ export default function CSVImport({ onFeedbackImported }) {
                   Smart Column Mapping
                 </CardTitle>
                 <CardDescription className="text-purple-700">
-                  Map your CSV columns to feedback fields. We've detected {preview.meta.fields.length} columns and {totalRows} total rows.
+                  Map your CSV columns to feedback fields. We've detected {preview.meta.fields.length} columns and will process {totalRows} rows.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
@@ -463,7 +478,7 @@ export default function CSVImport({ onFeedbackImported }) {
                       </Badge>
                     </h4>
                     <div className="flex items-center gap-2 text-sm text-purple-700">
-                      <span>📊 Total rows detected: {totalRows}</span>
+                      <span>📊 Rows to process: {totalRows}</span>
                     </div>
                   </div>
                   
@@ -698,6 +713,10 @@ export default function CSVImport({ onFeedbackImported }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Row limit:</span>
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300">100 rows max</Badge>
+              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Batch size:</span>
                 <Badge variant="outline">15 items</Badge>
