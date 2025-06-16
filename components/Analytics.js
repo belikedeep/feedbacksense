@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { format, isWithinInterval, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns'
+import { format, isWithinInterval, subDays, subMonths, subYears, startOfDay, endOfDay, parseISO, isValid } from 'date-fns'
 
 ChartJS.register(
   CategoryScale,
@@ -49,11 +49,31 @@ export default function Analytics({ feedback }) {
     if (!selectedTimeRange.start || !selectedTimeRange.end) return feedback
 
     return feedback.filter(item => {
-      const feedbackDate = new Date(item.feedbackDate || item.feedback_date)
-      return isWithinInterval(feedbackDate, {
-        start: selectedTimeRange.start,
-        end: selectedTimeRange.end
-      })
+      try {
+        // Standardize date field handling
+        const dateValue = item.feedbackDate || item.feedback_date
+        if (!dateValue) return false
+
+        // Parse date properly handling both ISO strings and Date objects
+        let feedbackDate
+        if (typeof dateValue === 'string') {
+          // Handle both full ISO strings and date-only strings
+          feedbackDate = dateValue.includes('T') ? parseISO(dateValue) : parseISO(dateValue + 'T00:00:00.000Z')
+        } else {
+          feedbackDate = new Date(dateValue)
+        }
+
+        // Validate parsed date
+        if (!isValid(feedbackDate)) return false
+
+        return isWithinInterval(feedbackDate, {
+          start: selectedTimeRange.start,
+          end: selectedTimeRange.end
+        })
+      } catch (error) {
+        console.warn('Error parsing feedback date:', error, item)
+        return false
+      }
     })
   }, [feedback, selectedTimeRange])
 
@@ -61,16 +81,48 @@ export default function Analytics({ feedback }) {
   const previousPeriodData = useMemo(() => {
     if (!selectedTimeRange.start || !selectedTimeRange.end) return []
 
-    const rangeDuration = selectedTimeRange.end - selectedTimeRange.start
-    const previousStart = new Date(selectedTimeRange.start.getTime() - rangeDuration)
-    const previousEnd = new Date(selectedTimeRange.end.getTime() - rangeDuration)
+    let previousStart, previousEnd
+    
+    // Calculate previous period based on range type, handling month boundaries properly
+    if (selectedTimeRange.rangeId === 'last3months') {
+      previousStart = subMonths(selectedTimeRange.start, 3)
+      previousEnd = subMonths(selectedTimeRange.end, 3)
+    } else if (selectedTimeRange.rangeId === 'last6months') {
+      previousStart = subMonths(selectedTimeRange.start, 6)
+      previousEnd = subMonths(selectedTimeRange.end, 6)
+    } else if (selectedTimeRange.rangeId === '1year') {
+      previousStart = subYears(selectedTimeRange.start, 1)
+      previousEnd = subYears(selectedTimeRange.end, 1)
+    } else {
+      // For day-based ranges, use day subtraction
+      const rangeDays = Math.ceil((selectedTimeRange.end - selectedTimeRange.start) / (1000 * 60 * 60 * 24))
+      previousStart = subDays(selectedTimeRange.start, rangeDays)
+      previousEnd = subDays(selectedTimeRange.end, rangeDays)
+    }
 
     return feedback.filter(item => {
-      const feedbackDate = new Date(item.feedbackDate || item.feedback_date)
-      return isWithinInterval(feedbackDate, {
-        start: previousStart,
-        end: previousEnd
-      })
+      try {
+        // Use same date parsing logic as filteredFeedback
+        const dateValue = item.feedbackDate || item.feedback_date
+        if (!dateValue) return false
+
+        let feedbackDate
+        if (typeof dateValue === 'string') {
+          feedbackDate = dateValue.includes('T') ? parseISO(dateValue) : parseISO(dateValue + 'T00:00:00.000Z')
+        } else {
+          feedbackDate = new Date(dateValue)
+        }
+
+        if (!isValid(feedbackDate)) return false
+
+        return isWithinInterval(feedbackDate, {
+          start: previousStart,
+          end: previousEnd
+        })
+      } catch (error) {
+        console.warn('Error parsing feedback date for previous period:', error, item)
+        return false
+      }
     })
   }, [feedback, selectedTimeRange])
 
@@ -183,14 +235,25 @@ export default function Analytics({ feedback }) {
         const dateStr = date.toISOString().split('T')[0]
 
         const dayFeedback = data.filter(f => {
-          const feedbackDate = f.feedbackDate || f.feedback_date
-          if (!feedbackDate) return false
-          
-          const feedbackDateStr = typeof feedbackDate === 'string'
-            ? feedbackDate.split('T')[0]
-            : new Date(feedbackDate).toISOString().split('T')[0]
-          
-          return feedbackDateStr === dateStr
+          try {
+            const dateValue = f.feedbackDate || f.feedback_date
+            if (!dateValue) return false
+            
+            let feedbackDate
+            if (typeof dateValue === 'string') {
+              feedbackDate = dateValue.includes('T') ? parseISO(dateValue) : parseISO(dateValue + 'T00:00:00.000Z')
+            } else {
+              feedbackDate = new Date(dateValue)
+            }
+            
+            if (!isValid(feedbackDate)) return false
+            
+            const feedbackDateStr = feedbackDate.toISOString().split('T')[0]
+            return feedbackDateStr === dateStr
+          } catch (error) {
+            console.warn('Error parsing date in trend generation:', error, f)
+            return false
+          }
         })
 
         trendData.push({
@@ -211,21 +274,45 @@ export default function Analytics({ feedback }) {
       .map(trend => ({
         ...trend,
         aiAnalyzed: filteredFeedback.filter(f => {
-          const feedbackDate = f.feedbackDate || f.feedback_date
-          if (!feedbackDate) return false
-          const feedbackDateStr = typeof feedbackDate === 'string'
-            ? feedbackDate.split('T')[0]
-            : new Date(feedbackDate).toISOString().split('T')[0]
-          return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+          try {
+            const dateValue = f.feedbackDate || f.feedback_date
+            if (!dateValue) return false
+            
+            let feedbackDate
+            if (typeof dateValue === 'string') {
+              feedbackDate = dateValue.includes('T') ? parseISO(dateValue) : parseISO(dateValue + 'T00:00:00.000Z')
+            } else {
+              feedbackDate = new Date(dateValue)
+            }
+            
+            if (!isValid(feedbackDate)) return false
+            
+            const feedbackDateStr = feedbackDate.toISOString().split('T')[0]
+            return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+          } catch (error) {
+            return false
+          }
         }).length,
         avgConfidence: (() => {
           const dayAIFeedback = filteredFeedback.filter(f => {
-            const feedbackDate = f.feedbackDate || f.feedback_date
-            if (!feedbackDate) return false
-            const feedbackDateStr = typeof feedbackDate === 'string'
-              ? feedbackDate.split('T')[0]
-              : new Date(feedbackDate).toISOString().split('T')[0]
-            return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+            try {
+              const dateValue = f.feedbackDate || f.feedback_date
+              if (!dateValue) return false
+              
+              let feedbackDate
+              if (typeof dateValue === 'string') {
+                feedbackDate = dateValue.includes('T') ? parseISO(dateValue) : parseISO(dateValue + 'T00:00:00.000Z')
+              } else {
+                feedbackDate = new Date(dateValue)
+              }
+              
+              if (!isValid(feedbackDate)) return false
+              
+              const feedbackDateStr = feedbackDate.toISOString().split('T')[0]
+              return feedbackDateStr === trend.date && f.aiCategoryConfidence !== null
+            } catch (error) {
+              return false
+            }
           })
           return dayAIFeedback.length > 0
             ? dayAIFeedback.reduce((sum, f) => sum + parseFloat(f.aiCategoryConfidence || 0), 0) / dayAIFeedback.length
@@ -475,6 +562,33 @@ export default function Analytics({ feedback }) {
         initialRange={selectedTimeRange.rangeId}
       />
 
+      {/* Date Range Display */}
+      {selectedTimeRange.start && selectedTimeRange.end && (
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-blue-900">Analytics Period</span>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="text-lg font-semibold text-blue-900">
+                  {format(selectedTimeRange.start, 'MMM dd, yyyy')} - {format(selectedTimeRange.end, 'MMM dd, yyyy')}
+                </div>
+                <Badge variant="outline" className="text-xs bg-white/70 text-blue-700 border-blue-300 w-fit">
+                  {Math.ceil((selectedTimeRange.end - selectedTimeRange.start) / (1000 * 60 * 60 * 24)) + 1} days
+                </Badge>
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-blue-700">
+              Showing data from {format(selectedTimeRange.start, 'EEEE, MMMM do, yyyy')} to {format(selectedTimeRange.end, 'EEEE, MMMM do, yyyy')}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Export Panel */}
       {showExportPanel && (
         <Card>
@@ -503,20 +617,26 @@ export default function Analytics({ feedback }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalFeedback}</div>
-            {periodComparison.hasPreviousData && (
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                <Badge
-                  className={
-                    periodComparison.totalChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
-                    periodComparison.totalChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
-                    'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }
-                >
-                  {formatChange(periodComparison.totalChange)}
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {periodComparison.hasPreviousData ? (
+                <>
+                  <Badge
+                    className={
+                      periodComparison.totalChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                      periodComparison.totalChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                      'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }
+                  >
+                    {formatChange(periodComparison.totalChange)}
+                  </Badge>
+                  <span>from previous period</span>
+                </>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  No historical data
                 </Badge>
-                <span>from previous period</span>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -529,20 +649,26 @@ export default function Analytics({ feedback }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.sentimentDistribution.positive || 0}</div>
-            {periodComparison.hasPreviousData && (
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                <Badge
-                  className={
-                    periodComparison.positiveChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
-                    periodComparison.positiveChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
-                    'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }
-                >
-                  {formatChange(periodComparison.positiveChange)}
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {periodComparison.hasPreviousData ? (
+                <>
+                  <Badge
+                    className={
+                      periodComparison.positiveChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                      periodComparison.positiveChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                      'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }
+                  >
+                    {formatChange(periodComparison.positiveChange)}
+                  </Badge>
+                  <span>from previous period</span>
+                </>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  No comparison data
                 </Badge>
-                <span>from previous period</span>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -575,20 +701,26 @@ export default function Analytics({ feedback }) {
             <div className="text-2xl font-bold">
               {isNaN(analytics.averageSentiment) ? '0.0' : (analytics.averageSentiment * 100).toFixed(1)}%
             </div>
-            {periodComparison.hasPreviousData && (
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                <Badge
-                  className={
-                    periodComparison.sentimentChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
-                    periodComparison.sentimentChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
-                    'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }
-                >
-                  {formatChange(periodComparison.sentimentChange)}
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {periodComparison.hasPreviousData ? (
+                <>
+                  <Badge
+                    className={
+                      periodComparison.sentimentChange > 0 ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                      periodComparison.sentimentChange < 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+                      'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }
+                  >
+                    {formatChange(periodComparison.sentimentChange)}
+                  </Badge>
+                  <span>from previous period</span>
+                </>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  No trend data
                 </Badge>
-                <span>from previous period</span>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
