@@ -13,6 +13,21 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import BrandLogo from '@/components/icons/BrandLogo'
+import AnalyticsIcon from '@/components/icons/AnalyticsIcon'
+import AIIcon from '@/components/icons/AIIcon'
+import DataProcessingIcon from '@/components/icons/DataProcessingIcon'
+import SecurityIcon from '@/components/icons/SecurityIcon'
+import {
+  PlusIcon,
+  DocumentArrowUpIcon,
+  DocumentTextIcon,
+  ChartBarIcon,
+  UserIcon,
+  ArrowRightOnRectangleIcon,
+  ArrowPathIcon,
+  DocumentArrowDownIcon
+} from '@heroicons/react/24/outline'
 
 export default function Dashboard({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -123,66 +138,109 @@ export default function Dashboard({ user, onSignOut }) {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100 overflow-hidden">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 w-64 h-screen border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg">
+      <aside className="fixed left-0 top-0 z-40 w-72 h-screen bg-gradient-to-b from-teal-900 via-teal-800 to-teal-700 shadow-2xl">
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex items-center gap-3 border-b px-6 py-5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <span className="text-sm font-bold">FS</span>
-            </div>
+          <div className="flex items-center gap-3 border-b border-teal-600/30 px-6 py-6">
+            <BrandLogo className="w-10 h-10 text-stone-100" />
             <div className="flex flex-col">
-              <h1 className="text-lg font-bold tracking-tight">FeedbackSense</h1>
-              <Badge variant="secondary" className="w-fit text-xs">
-                v2.0
+              <h1 className="text-xl font-bold tracking-tight text-stone-50">FeedbackSense</h1>
+              <Badge className="w-fit text-xs bg-amber-500/20 text-amber-200 border-amber-400/30 hover:bg-amber-500/30">
+                v2.0 AI-Powered
               </Badge>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-2 p-4">
+          <nav className="space-y-2 p-4 flex-1">
+            <div className="text-xs font-semibold text-stone-300 uppercase tracking-wider mb-4">
+              Main Navigation
+            </div>
             {[
-              { id: 'dashboard', label: 'Dashboard', icon: '📊', description: 'Analytics overview' },
-              { id: 'add-feedback', label: 'Add Feedback', icon: '➕', description: 'Create new entry' },
-              { id: 'import-csv', label: 'Import CSV', icon: '📁', description: 'Bulk import data' },
-              { id: 'feedback-list', label: 'All Feedback', icon: '📝', description: 'View all entries' },
-              { id: 'category-analytics', label: 'Categories', icon: '📈', description: 'Category insights' },
-              { id: 'ai-performance', label: 'AI Performance', icon: '🤖', description: 'AI metrics' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-                  activeTab === item.id
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <div className="flex flex-col">
-                  <span>{item.label}</span>
-                  <span className="text-xs opacity-70">{item.description}</span>
-                </div>
-              </button>
-            ))}
+              {
+                id: 'dashboard',
+                label: 'Analytics Dashboard',
+                icon: AnalyticsIcon,
+                description: 'Comprehensive insights'
+              },
+              {
+                id: 'add-feedback',
+                label: 'Add Feedback',
+                icon: PlusIcon,
+                description: 'Create new entry'
+              },
+              {
+                id: 'import-csv',
+                label: 'Import Data',
+                icon: DocumentArrowUpIcon,
+                description: 'Bulk import CSV'
+              },
+              {
+                id: 'feedback-list',
+                label: 'All Feedback',
+                icon: DocumentTextIcon,
+                description: 'View all entries'
+              },
+              {
+                id: 'category-analytics',
+                label: 'Category Insights',
+                icon: ChartBarIcon,
+                description: 'Deep category analysis'
+              },
+              {
+                id: 'ai-performance',
+                label: 'AI Performance',
+                icon: AIIcon,
+                description: 'AI metrics & accuracy'
+              },
+            ].map((item) => {
+              const IconComponent = item.icon;
+              const isActive = activeTab === item.id;
+              
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-stone-100/10 text-stone-50 shadow-lg backdrop-blur-sm border border-stone-100/20'
+                      : 'text-stone-200 hover:bg-stone-100/5 hover:text-stone-50 hover:translate-x-1'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-amber-400/20 text-amber-200'
+                      : 'bg-teal-600/30 text-stone-300 group-hover:bg-teal-500/40 group-hover:text-stone-200'
+                  }`}>
+                    <IconComponent className="h-5 w-5" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold">{item.label}</span>
+                    <span className={`text-xs ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
+                      {item.description}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </nav>
 
-          <Separator />
-
           {/* Quick Actions */}
-          <div className="space-y-2 p-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          <div className="space-y-3 p-4 border-t border-teal-600/30">
+            <div className="text-xs font-semibold text-stone-300 uppercase tracking-wider mb-3">
               Quick Actions
-            </h3>
+            </div>
             <Button
               onClick={reanalyzeAllFeedback}
               variant="outline"
               size="sm"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-3 bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50"
               title="Re-analyze all feedback with AI categorization"
             >
-              🤖 Re-analyze All
+              <AIIcon className="h-4 w-4" />
+              <span>Re-analyze All</span>
             </Button>
             <Button
               onClick={() => {
@@ -206,28 +264,28 @@ export default function Dashboard({ user, onSignOut }) {
               }}
               variant="outline"
               size="sm"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-3 bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50"
               title="Export category analysis report"
             >
-              📊 Export Report
+              <DocumentArrowDownIcon className="h-4 w-4" />
+              <span>Export Report</span>
             </Button>
           </div>
 
-          <Separator />
-
-          {/* User Section - Always Visible */}
-          <div className="border-t p-4 mt-auto">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+          {/* User Section */}
+          <div className="border-t border-teal-600/30 p-4 bg-teal-800/30">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-lg">
+                <UserIcon className="h-5 w-5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-sm font-medium truncate">
+                <span className="text-sm font-semibold truncate text-stone-50">
                   {user?.email || 'User'}
                 </span>
-                <span className="text-xs text-muted-foreground">Online</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span className="text-xs text-stone-300">Online</span>
+                </div>
               </div>
             </div>
             <div className="space-y-2">
@@ -235,23 +293,19 @@ export default function Dashboard({ user, onSignOut }) {
                 variant="outline"
                 size="sm"
                 onClick={() => window.location.href = '/dashboard/profile'}
-                className="w-full justify-start gap-2"
+                className="w-full justify-start gap-3 bg-transparent border-stone-300/30 text-stone-200 hover:bg-stone-100/10 hover:text-stone-50 hover:border-stone-200/50"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                View Profile
+                <UserIcon className="h-4 w-4" />
+                <span>View Profile</span>
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={handleSignOut}
-                className="w-full justify-start gap-2"
+                className="w-full justify-start gap-3 bg-transparent border-red-400/30 text-red-200 hover:bg-red-500/20 hover:text-red-100 hover:border-red-300/50"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Sign Out
+                <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                <span>Sign Out</span>
               </Button>
             </div>
           </div>
@@ -259,51 +313,63 @@ export default function Dashboard({ user, onSignOut }) {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-1 flex flex-col overflow-hidden">
+      <main className="ml-72 flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
+        <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-30 shadow-sm">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-3 text-gray-900">
                   {activeTab === 'dashboard' && (
                     <>
-                      <span className="text-2xl">📊</span>
-                      Dashboard Analytics
+                      <div className="p-2 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg">
+                        <AnalyticsIcon className="h-6 w-6 text-teal-700" />
+                      </div>
+                      Analytics Dashboard
                     </>
                   )}
                   {activeTab === 'add-feedback' && (
                     <>
-                      <span className="text-2xl">➕</span>
+                      <div className="p-2 bg-gradient-to-br from-amber-100 to-amber-200 rounded-lg">
+                        <PlusIcon className="h-6 w-6 text-amber-700" />
+                      </div>
                       Add New Feedback
                     </>
                   )}
                   {activeTab === 'import-csv' && (
                     <>
-                      <span className="text-2xl">📁</span>
+                      <div className="p-2 bg-gradient-to-br from-stone-100 to-stone-200 rounded-lg">
+                        <DocumentArrowUpIcon className="h-6 w-6 text-stone-700" />
+                      </div>
                       Import CSV Data
                     </>
                   )}
                   {activeTab === 'feedback-list' && (
                     <>
-                      <span className="text-2xl">📝</span>
+                      <div className="p-2 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg">
+                        <DocumentTextIcon className="h-6 w-6 text-teal-700" />
+                      </div>
                       All Feedback
                     </>
                   )}
                   {activeTab === 'category-analytics' && (
                     <>
-                      <span className="text-2xl">📈</span>
+                      <div className="p-2 bg-gradient-to-br from-amber-100 to-orange-100 rounded-lg">
+                        <ChartBarIcon className="h-6 w-6 text-amber-700" />
+                      </div>
                       Category Analytics
                     </>
                   )}
                   {activeTab === 'ai-performance' && (
                     <>
-                      <span className="text-2xl">🤖</span>
-                      AI Performance Metrics
+                      <div className="p-2 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg">
+                        <AIIcon className="h-6 w-6 text-teal-700" />
+                      </div>
+                      AI Performance
                     </>
                   )}
                 </h2>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-gray-600 text-sm mt-1">
                   {activeTab === 'dashboard' && 'Comprehensive insights and performance metrics'}
                   {activeTab === 'add-feedback' && 'Create a new feedback entry with AI categorization'}
                   {activeTab === 'import-csv' && 'Bulk import feedback data from CSV files'}
@@ -316,12 +382,12 @@ export default function Dashboard({ user, onSignOut }) {
             <div className="flex items-center gap-4">
               {feedback.length > 0 && (
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="gap-1">
-                    <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                  <Badge className="gap-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white hover:from-teal-700 hover:to-teal-800">
+                    <span className="h-2 w-2 rounded-full bg-amber-300"></span>
                     {feedback.length} entries
                   </Badge>
-                  <Badge variant="secondary" className="gap-1">
-                    <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                  <Badge className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-600 hover:to-amber-700">
+                    <span className="h-2 w-2 rounded-full bg-green-300 animate-pulse"></span>
                     Live
                   </Badge>
                 </div>
@@ -329,14 +395,12 @@ export default function Dashboard({ user, onSignOut }) {
               {activeTab === 'dashboard' && (
                 <div className="flex items-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="gap-2"
+                    className="gap-2 border-teal-200 text-teal-700 hover:bg-teal-50 hover:text-teal-800 hover:border-teal-300"
                     onClick={fetchFeedback}
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <ArrowPathIcon className="h-4 w-4" />
                     Refresh
                   </Button>
                 </div>
@@ -346,14 +410,14 @@ export default function Dashboard({ user, onSignOut }) {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
           <div className="p-6">
             {loading ? (
-              <Card>
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                 <CardContent className="flex justify-center items-center h-64">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                    <p className="text-muted-foreground">Loading dashboard...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+                    <p className="text-gray-600 font-medium">Loading dashboard...</p>
                   </div>
                 </CardContent>
               </Card>
@@ -361,35 +425,35 @@ export default function Dashboard({ user, onSignOut }) {
               <>
                 {activeTab === 'dashboard' && <Analytics feedback={feedback} />}
                 {activeTab === 'add-feedback' && (
-                  <Card>
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
                       <FeedbackForm onFeedbackAdded={addFeedback} />
                     </CardContent>
                   </Card>
                 )}
                 {activeTab === 'import-csv' && (
-                  <Card>
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
                       <CSVImport onFeedbackImported={addBulkFeedback} />
                     </CardContent>
                   </Card>
                 )}
                 {activeTab === 'feedback-list' && (
-                  <Card>
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
                       <FeedbackList feedback={feedback} onUpdate={fetchFeedback} />
                     </CardContent>
                   </Card>
                 )}
                 {activeTab === 'category-analytics' && (
-                  <Card>
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
                       <CategoryAnalytics feedback={feedback} />
                     </CardContent>
                   </Card>
                 )}
                 {activeTab === 'ai-performance' && (
-                  <Card>
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
                       <AIPerformanceMetrics feedback={feedback} />
                     </CardContent>

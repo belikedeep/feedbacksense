@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
+import BrandLogo from '@/components/icons/BrandLogo'
+import SecurityIcon from '@/components/icons/SecurityIcon'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -83,24 +85,79 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center bg-gray-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo */}
-        <div className="text-center">
-          <Link href="/" className="text-3xl font-bold text-blue-600">
-            FeedbackSense
-          </Link>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Welcome back
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Sign in to your account to continue
-          </p>
+    <div className="min-h-screen flex">
+      {/* Left Side - Brand Showcase (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal-900 via-teal-800 to-teal-700 relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-stone-200/10 to-amber-200/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-br from-teal-400/20 to-teal-500/20 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
+        </div>
+        
+        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
+          {/* Brand Header */}
+          <div className="mb-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <BrandLogo className="w-12 h-12 text-stone-200" />
+              <span className="text-3xl font-bold text-stone-100">
+                FeedbackSense
+              </span>
+            </div>
+            <h1 className="text-4xl font-bold text-stone-100 mb-4">
+              Transform Customer Feedback Into Growth
+            </h1>
+            <p className="text-xl text-stone-200/90 leading-relaxed">
+              Join thousands of businesses using AI-powered sentiment analysis to understand their customers better.
+            </p>
+          </div>
+          
+          {/* Features List */}
+          <div className="space-y-4 mb-8">
+            {[
+              "AI-powered sentiment analysis",
+              "Real-time feedback insights",
+              "Beautiful analytics dashboard",
+              "Enterprise-grade security"
+            ].map((feature, index) => (
+              <div key={index} className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+                <span className="text-stone-200">{feature}</span>
+              </div>
+            ))}
+          </div>
+          
+          {/* Illustration */}
+          <div className="flex justify-center">
+            <SecurityIcon className="w-32 h-32 text-stone-200/30" />
+          </div>
         </div>
       </div>
+      
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
+        <div className="w-full max-w-md mx-auto px-6 py-12">
+          {/* Mobile Logo (Only shown on mobile) */}
+          <div className="lg:hidden text-center mb-8">
+            <Link href="/" className="inline-flex items-center space-x-3 group">
+              <BrandLogo className="w-10 h-10 text-teal-700 group-hover:text-teal-800 transition-colors" />
+              <span className="text-3xl font-bold text-gray-800">
+                FeedbackSense
+              </span>
+            </Link>
+          </div>
+          
+          {/* Form Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Sign in to your account to continue
+            </p>
+          </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {/* Form Container */}
+          <div className="bg-white/90 backdrop-blur-sm py-8 px-6 shadow-xl border border-stone-200 rounded-2xl">
           <form className="space-y-6" onSubmit={handleLogin}>
             {/* Email */}
             <div>
@@ -116,7 +173,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white sm:text-sm transition-all"
                   placeholder="Enter your email"
                 />
               </div>
@@ -136,7 +193,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white sm:text-sm transition-all"
                   placeholder="Enter your password"
                 />
                 <button
@@ -156,7 +213,7 @@ export default function LoginPage() {
             {/* Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="text-sm">
-                <Link href="/reset-password" className="font-medium text-blue-600 hover:text-blue-500">
+                <Link href="/reset-password" className="font-medium text-teal-600 hover:text-teal-700 transition-colors">
                   Forgot your password?
                 </Link>
               </div>
@@ -167,7 +224,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:-translate-y-0.5"
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
@@ -175,7 +232,7 @@ export default function LoginPage() {
 
             {/* Message */}
             {message && (
-              <div className={`text-sm text-center ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+              <div className={`text-sm text-center p-3 rounded-lg ${message.includes('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
                 {message}
               </div>
             )}
@@ -188,7 +245,7 @@ export default function LoginPage() {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-3 bg-white text-gray-500">Or continue with</span>
               </div>
             </div>
 
@@ -196,7 +253,7 @@ export default function LoginPage() {
             <div className="mt-6">
               <button
                 onClick={handleGoogleSignIn}
-                className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -215,14 +272,14 @@ export default function LoginPage() {
                   <div className="w-full border-t border-gray-300" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Don't have an account?</span>
+                  <span className="px-3 bg-white text-gray-500">Don't have an account?</span>
                 </div>
               </div>
 
               <div className="mt-6">
                 <Link
                   href="/signup"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all"
                 >
                   Create new account
                 </Link>
@@ -232,31 +289,30 @@ export default function LoginPage() {
 
           {/* Back to Home */}
           <div className="mt-6 text-center">
-            <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
+            <Link href="/" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
               ← Back to home
             </Link>
           </div>
-        </div>
-      </div>
-
-      {/* Trust Signals */}
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="text-center">
-          <div className="flex justify-center items-center space-x-6 text-sm text-gray-500">
-            <div className="flex items-center">
-              <svg className="h-4 w-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Secure Login
-            </div>
-            <div className="flex items-center">
-              <svg className="h-4 w-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Data Protected
+          
+          {/* Trust Signals */}
+          <div className="mt-8 text-center">
+            <div className="flex justify-center items-center space-x-6 text-sm text-gray-600">
+              <div className="flex items-center">
+                <svg className="h-4 w-4 text-teal-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Secure Login
+              </div>
+              <div className="flex items-center">
+                <svg className="h-4 w-4 text-teal-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Data Protected
+              </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
