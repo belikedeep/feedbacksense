@@ -279,20 +279,45 @@ export default function Analytics({ feedback }) {
     setSelectedTimeRange({ start, end, rangeId })
   }
 
-  const sentimentChartData = {
-    labels: Object.keys(analytics.sentimentDistribution),
-    datasets: [
-      {
-        data: Object.values(analytics.sentimentDistribution),
-        backgroundColor: [
-          '#10B981', // green
-          '#EF4444', // red
-          '#6B7280', // gray
-        ],
-        borderWidth: 1,
-      },
-    ],
+  // Create consistent sentiment chart data with proper color mapping
+  const getSentimentChartData = () => {
+    const sentimentOrder = ['positive', 'negative', 'neutral']
+    const sentimentColors = {
+      positive: '#10B981', // green
+      negative: '#EF4444', // red
+      neutral: '#6B7280'   // gray
+    }
+    const sentimentLabels = {
+      positive: 'Positive',
+      negative: 'Negative',
+      neutral: 'Neutral'
+    }
+
+    const labels = []
+    const data = []
+    const backgroundColor = []
+
+    sentimentOrder.forEach(sentiment => {
+      if (analytics.sentimentDistribution[sentiment] > 0) {
+        labels.push(sentimentLabels[sentiment])
+        data.push(analytics.sentimentDistribution[sentiment])
+        backgroundColor.push(sentimentColors[sentiment])
+      }
+    })
+
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor,
+          borderWidth: 1,
+        },
+      ],
+    }
   }
+
+  const sentimentChartData = getSentimentChartData()
 
   const categoryChartData = {
     labels: Object.keys(analytics.categoryDistribution),

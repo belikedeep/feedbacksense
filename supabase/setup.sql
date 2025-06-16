@@ -1,13 +1,19 @@
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Create the profiles table (extends auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   email TEXT,
   name TEXT,
+  phone TEXT,
+  preferences JSONB DEFAULT '{}',
+  timezone TEXT DEFAULT 'UTC',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Create the feedback table
+-- Create the feedback table with all enhanced fields
 CREATE TABLE IF NOT EXISTS public.feedback (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -19,10 +25,22 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   topics TEXT[] DEFAULT '{}',
   feedback_date DATE DEFAULT CURRENT_DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  ai_category_confidence DECIMAL(3,2),
+  ai_classification_meta JSONB,
+  classification_history JSONB DEFAULT '[]',
+  manual_override BOOLEAN DEFAULT FALSE,
+  -- Enhanced feedback management fields
+  status TEXT DEFAULT 'new', -- new, in_review, resolved, archived
+  priority TEXT DEFAULT 'medium', -- high, medium, low
+  is_archived BOOLEAN DEFAULT FALSE,
+  archived_at TIMESTAMP WITH TIME ZONE,
+  edit_history JSONB DEFAULT '[]',
+  last_edited_by UUID,
+  last_edited_at TIMESTAMP WITH TIME ZONE
 );
 
--- Create the categories table (for custom categories)
+-- Create the categories table
 CREATE TABLE IF NOT EXISTS public.categories (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -33,12 +51,55 @@ CREATE TABLE IF NOT EXISTS public.categories (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Enable Row Level Security (RLS)
+-- Create the feedback_notes table
+CREATE TABLE IF NOT EXISTS public.feedback_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  feedback_id UUID REFERENCES public.feedback(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL,
+  is_internal BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Create the activity_logs table
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  action TEXT NOT NULL,
+  details JSONB,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
--- Create policies for profiles
+-- Drop existing policies if they exist to avoid conflicts
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can insert own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can update own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can delete own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can view own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can insert own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can update own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can delete own categories" ON public.categories;
+DROP POLICY IF EXISTS "Users can view own feedback notes" ON public.feedback_notes;
+DROP POLICY IF EXISTS "Users can insert own feedback notes" ON public.feedback_notes;
+DROP POLICY IF EXISTS "Users can update own feedback notes" ON public.feedback_notes;
+DROP POLICY IF EXISTS "Users can delete own feedback notes" ON public.feedback_notes;
+DROP POLICY IF EXISTS "Users can view own activity logs" ON public.activity_logs;
+DROP POLICY IF EXISTS "Users can insert own activity logs" ON public.activity_logs;
+
+-- Create RLS policies for profiles
 CREATE POLICY "Users can view own profile" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
 
@@ -48,7 +109,7 @@ CREATE POLICY "Users can update own profile" ON public.profiles
 CREATE POLICY "Users can insert own profile" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Create policies for feedback
+-- Create RLS policies for feedback
 CREATE POLICY "Users can view own feedback" ON public.feedback
   FOR SELECT USING (auth.uid() = user_id);
 
@@ -61,7 +122,7 @@ CREATE POLICY "Users can update own feedback" ON public.feedback
 CREATE POLICY "Users can delete own feedback" ON public.feedback
   FOR DELETE USING (auth.uid() = user_id);
 
--- Create policies for categories
+-- Create RLS policies for categories
 CREATE POLICY "Users can view own categories" ON public.categories
   FOR SELECT USING (auth.uid() = user_id);
 
@@ -74,12 +135,42 @@ CREATE POLICY "Users can update own categories" ON public.categories
 CREATE POLICY "Users can delete own categories" ON public.categories
   FOR DELETE USING (auth.uid() = user_id);
 
+-- Create RLS policies for feedback_notes
+CREATE POLICY "Users can view own feedback notes" ON public.feedback_notes
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own feedback notes" ON public.feedback_notes
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own feedback notes" ON public.feedback_notes
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own feedback notes" ON public.feedback_notes
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Create RLS policies for activity_logs
+CREATE POLICY "Users can view own activity logs" ON public.activity_logs
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own activity logs" ON public.activity_logs
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS feedback_user_id_idx ON public.feedback(user_id);
 CREATE INDEX IF NOT EXISTS feedback_created_at_idx ON public.feedback(created_at);
 CREATE INDEX IF NOT EXISTS feedback_sentiment_label_idx ON public.feedback(sentiment_label);
 CREATE INDEX IF NOT EXISTS feedback_category_idx ON public.feedback(category);
 CREATE INDEX IF NOT EXISTS feedback_date_idx ON public.feedback(feedback_date);
+CREATE INDEX IF NOT EXISTS feedback_status_idx ON public.feedback(status);
+CREATE INDEX IF NOT EXISTS feedback_priority_idx ON public.feedback(priority);
+CREATE INDEX IF NOT EXISTS feedback_is_archived_idx ON public.feedback(is_archived);
+
+CREATE INDEX IF NOT EXISTS feedback_notes_feedback_id_idx ON public.feedback_notes(feedback_id);
+CREATE INDEX IF NOT EXISTS feedback_notes_user_id_idx ON public.feedback_notes(user_id);
+CREATE INDEX IF NOT EXISTS feedback_notes_created_at_idx ON public.feedback_notes(created_at);
+
+CREATE INDEX IF NOT EXISTS activity_logs_user_id_idx ON public.activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS activity_logs_created_at_idx ON public.activity_logs(created_at);
 
 -- Function to automatically create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -88,6 +179,9 @@ BEGIN
   INSERT INTO public.profiles (id, email, name)
   VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'name', NEW.email));
   RETURN NEW;
+EXCEPTION
+  WHEN others THEN
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -107,24 +201,56 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS handle_profiles_updated_at ON public.profiles;
 CREATE TRIGGER handle_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+DROP TRIGGER IF EXISTS handle_feedback_updated_at ON public.feedback;
 CREATE TRIGGER handle_feedback_updated_at
   BEFORE UPDATE ON public.feedback
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+DROP TRIGGER IF EXISTS handle_categories_updated_at ON public.categories;
 CREATE TRIGGER handle_categories_updated_at
   BEFORE UPDATE ON public.categories
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Insert default categories
-INSERT INTO public.categories (user_id, name, color, is_default)
-SELECT 
-  auth.uid(),
-  unnest(ARRAY['general', 'product', 'service', 'pricing', 'delivery', 'support', 'feature']),
-  unnest(ARRAY['#6B7280', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4']),
-  true
-WHERE auth.uid() IS NOT NULL
-ON CONFLICT DO NOTHING;
+DROP TRIGGER IF EXISTS handle_feedback_notes_updated_at ON public.feedback_notes;
+CREATE TRIGGER handle_feedback_notes_updated_at
+  BEFORE UPDATE ON public.feedback_notes
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Function to create default categories for new users
+CREATE OR REPLACE FUNCTION public.create_default_categories_for_user(user_uuid UUID)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO public.categories (user_id, name, color, is_default)
+  VALUES 
+    (user_uuid, 'general', '#6B7280', true),
+    (user_uuid, 'product', '#3B82F6', true),
+    (user_uuid, 'service', '#10B981', true),
+    (user_uuid, 'pricing', '#F59E0B', true),
+    (user_uuid, 'delivery', '#EF4444', true),
+    (user_uuid, 'support', '#8B5CF6', true),
+    (user_uuid, 'feature', '#06B6D4', true)
+  ON CONFLICT DO NOTHING;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update the user creation function to also create default categories
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, name)
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'name', NEW.email));
+  
+  -- Create default categories for the new user
+  PERFORM public.create_default_categories_for_user(NEW.id);
+  
+  RETURN NEW;
+EXCEPTION
+  WHEN others THEN
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

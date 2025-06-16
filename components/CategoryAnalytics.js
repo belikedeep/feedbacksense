@@ -174,16 +174,45 @@ export default function CategoryAnalytics({ feedback }) {
       }
     : analytics.categories[selectedCategory]?.sentiment || { positive: 0, negative: 0, neutral: 0 }
 
-  const sentimentChartData = {
-    labels: ['Positive', 'Negative', 'Neutral'],
-    datasets: [
-      {
-        data: [sentimentData.positive, sentimentData.negative, sentimentData.neutral],
-        backgroundColor: ['#10B981', '#EF4444', '#6B7280'],
-        borderWidth: 1,
-      },
-    ],
+  // Create consistent sentiment chart data with proper color mapping
+  const getSentimentChartData = () => {
+    const sentimentOrder = ['positive', 'negative', 'neutral']
+    const sentimentColors = {
+      positive: '#10B981', // green
+      negative: '#EF4444', // red
+      neutral: '#6B7280'   // gray
+    }
+    const sentimentLabels = {
+      positive: 'Positive',
+      negative: 'Negative',
+      neutral: 'Neutral'
+    }
+
+    const labels = []
+    const data = []
+    const backgroundColor = []
+
+    sentimentOrder.forEach(sentiment => {
+      if (sentimentData[sentiment] > 0) {
+        labels.push(sentimentLabels[sentiment])
+        data.push(sentimentData[sentiment])
+        backgroundColor.push(sentimentColors[sentiment])
+      }
+    })
+
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          backgroundColor,
+          borderWidth: 1,
+        },
+      ],
+    }
   }
+
+  const sentimentChartData = getSentimentChartData()
 
   const chartOptions = {
     responsive: true,
@@ -451,18 +480,24 @@ export default function CategoryAnalytics({ feedback }) {
               <Pie data={sentimentChartData} options={{ responsive: true }} />
             </div>
             <div className="mt-4 flex justify-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-sm">Positive ({sentimentData.positive})</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span className="text-sm">Negative ({sentimentData.negative})</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                <span className="text-sm">Neutral ({sentimentData.neutral})</span>
-              </div>
+              {sentimentData.positive > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm">Positive ({sentimentData.positive})</span>
+                </div>
+              )}
+              {sentimentData.negative > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-sm">Negative ({sentimentData.negative})</span>
+                </div>
+              )}
+              {sentimentData.neutral > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                  <span className="text-sm">Neutral ({sentimentData.neutral})</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
