@@ -101,109 +101,113 @@ export default function DateRangePicker({ onDateRangeChange, initialStartDate, i
   }
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
       {/* Quick Range Pills */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600 mr-1">Range:</span>
-        {predefinedRanges.map((range, index) => (
-          <Button
-            key={index}
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-7 px-3 text-xs font-medium transition-all duration-200",
-              selectedRange === range.label 
-                ? "bg-teal-500 text-white border-teal-500 hover:bg-teal-600" 
-                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-            )}
-            onClick={() => handlePredefinedRange(range)}
-          >
-            {range.label}
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-gray-600 mr-1 shrink-0">Range:</span>
+        <div className="flex flex-wrap gap-1.5">
+          {predefinedRanges.map((range, index) => (
+            <Button
+              key={index}
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-8 sm:h-7 px-3 text-xs font-medium transition-all duration-200 touch-manipulation",
+                selectedRange === range.label 
+                  ? "bg-teal-500 text-white border-teal-500 hover:bg-teal-600" 
+                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              )}
+              onClick={() => handlePredefinedRange(range)}
+            >
+              {range.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      {/* Separator */}
-      <div className="h-4 w-px bg-gray-300"></div>
+      {/* Separator - Hidden on mobile */}
+      <div className="hidden sm:block h-4 w-px bg-gray-300 shrink-0"></div>
 
       {/* Custom Date Inputs */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600">Custom:</span>
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+        <span className="text-sm font-medium text-gray-600 shrink-0">Custom:</span>
         
-        {/* Start Date */}
-        <Popover open={startDatePopoverOpen} onOpenChange={setStartDatePopoverOpen}>
-          <PopoverTrigger asChild>
+        <div className="flex items-center gap-2">
+          {/* Start Date */}
+          <Popover open={startDatePopoverOpen} onOpenChange={setStartDatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 sm:h-7 px-2 text-xs min-w-[70px] sm:min-w-[60px] justify-center touch-manipulation",
+                  startDate && !selectedRange 
+                    ? "bg-teal-50 border-teal-300 text-teal-900 hover:bg-teal-100" 
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <CalendarIcon className="mr-1 h-3 w-3 shrink-0" />
+                <span className="truncate">{getCustomDateDisplay('start')}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start" side="bottom">
+              <Calendar
+                mode="single"
+                selected={startDate}
+                onSelect={handleStartDateSelect}
+                disabled={(date) => isDateDisabled(date, 'start')}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <span className="text-xs text-gray-400 shrink-0">→</span>
+
+          {/* End Date */}
+          <Popover open={endDatePopoverOpen} onOpenChange={setEndDatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 sm:h-7 px-2 text-xs min-w-[70px] sm:min-w-[60px] justify-center touch-manipulation",
+                  endDate && !selectedRange 
+                    ? "bg-teal-50 border-teal-300 text-teal-900 hover:bg-teal-100" 
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <CalendarIcon className="mr-1 h-3 w-3 shrink-0" />
+                <span className="truncate">{getCustomDateDisplay('end')}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start" side="bottom">
+              <Calendar
+                mode="single"
+                selected={endDate}
+                onSelect={handleEndDateSelect}
+                disabled={(date) => isDateDisabled(date, 'end')}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Clear Custom Dates */}
+          {(startDate || endDate) && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className={cn(
-                "h-7 px-2 text-xs min-w-[60px] justify-center",
-                startDate && !selectedRange 
-                  ? "bg-teal-50 border-teal-300 text-teal-900 hover:bg-teal-100" 
-                  : "border-gray-200 hover:border-gray-300"
-              )}
+              className="h-8 w-8 sm:h-7 sm:w-7 p-0 hover:bg-red-50 hover:text-red-600 touch-manipulation shrink-0"
+              onClick={clearDateRange}
             >
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {getCustomDateDisplay('start')}
+              <X className="h-3 w-3" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={startDate}
-              onSelect={handleStartDateSelect}
-              disabled={(date) => isDateDisabled(date, 'start')}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-
-        <span className="text-xs text-gray-400">→</span>
-
-        {/* End Date */}
-        <Popover open={endDatePopoverOpen} onOpenChange={setEndDatePopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "h-7 px-2 text-xs min-w-[60px] justify-center",
-                endDate && !selectedRange 
-                  ? "bg-teal-50 border-teal-300 text-teal-900 hover:bg-teal-100" 
-                  : "border-gray-200 hover:border-gray-300"
-              )}
-            >
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {getCustomDateDisplay('end')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={endDate}
-              onSelect={handleEndDateSelect}
-              disabled={(date) => isDateDisabled(date, 'end')}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-
-        {/* Clear Custom Dates */}
-        {(startDate || endDate) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600"
-            onClick={clearDateRange}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Current Selection Info */}
       {!selectedRange && startDate && endDate && (
-        <div className="ml-auto">
+        <div className="flex sm:ml-auto">
           <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
             {getDaysCount()} days
           </Badge>
@@ -212,7 +216,7 @@ export default function DateRangePicker({ onDateRangeChange, initialStartDate, i
 
       {/* Error State */}
       {startDate && endDate && startDate > endDate && (
-        <div className="ml-auto">
+        <div className="flex sm:ml-auto">
           <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
             Invalid range
           </Badge>

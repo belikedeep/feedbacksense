@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
+import Sidebar from '@/components/Sidebar'
+import MobileHeader from '@/components/MobileHeader'
 import FeedbackForm from './FeedbackForm'
 import CSVImport from './CSVImport'
 import FeedbackList from './FeedbackList'
@@ -11,28 +14,21 @@ import AIPerformanceMetrics from './AIPerformanceMetrics'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
-import BrandLogo from '@/components/icons/BrandLogo'
 import AnalyticsIcon from '@/components/icons/AnalyticsIcon'
 import AIIcon from '@/components/icons/AIIcon'
-import DataProcessingIcon from '@/components/icons/DataProcessingIcon'
-import SecurityIcon from '@/components/icons/SecurityIcon'
 import {
   PlusIcon,
   DocumentArrowUpIcon,
   DocumentTextIcon,
   ChartBarIcon,
-  UserIcon,
-  ArrowRightOnRectangleIcon,
-  ArrowPathIcon,
-  DocumentArrowDownIcon
+  ArrowPathIcon
 } from '@heroicons/react/24/outline'
 
-export default function Dashboard({ user, onSignOut }) {
+function DashboardContent({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
+  const { getMainContentMargin, isDesktop } = useSidebar()
 
   useEffect(() => {
     initializeUser()
@@ -139,183 +135,29 @@ export default function Dashboard({ user, onSignOut }) {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 w-72 h-screen bg-gradient-to-b from-teal-900 via-teal-800 to-teal-700 shadow-2xl">
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex items-center gap-3 border-b border-teal-600/30 px-6 py-6">
-            <BrandLogo className="w-10 h-10 text-stone-100" />
-            <div className="flex flex-col">
-              <h1 className="text-xl font-bold tracking-tight text-stone-50">FeedbackSense</h1>
-              <Badge className="w-fit text-xs bg-amber-500/20 text-amber-200 border-amber-400/30 hover:bg-amber-500/30">
-                v2.0 AI-Powered
-              </Badge>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="space-y-2 p-4 flex-1">
-            <div className="text-xs font-semibold text-stone-300 uppercase tracking-wider mb-4">
-              Main Navigation
-            </div>
-            {[
-              {
-                id: 'dashboard',
-                label: 'Analytics Dashboard',
-                icon: AnalyticsIcon,
-                description: 'Comprehensive insights'
-              },
-              {
-                id: 'add-feedback',
-                label: 'Add Feedback',
-                icon: PlusIcon,
-                description: 'Create new entry'
-              },
-              {
-                id: 'import-csv',
-                label: 'Import Data',
-                icon: DocumentArrowUpIcon,
-                description: 'Bulk import CSV'
-              },
-              {
-                id: 'feedback-list',
-                label: 'All Feedback',
-                icon: DocumentTextIcon,
-                description: 'View all entries'
-              },
-              {
-                id: 'category-analytics',
-                label: 'Category Insights',
-                icon: ChartBarIcon,
-                description: 'Deep category analysis'
-              },
-              {
-                id: 'ai-performance',
-                label: 'AI Performance',
-                icon: AIIcon,
-                description: 'AI metrics & accuracy'
-              },
-            ].map((item) => {
-              const IconComponent = item.icon;
-              const isActive = activeTab === item.id;
-              
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 group ${
-                    isActive
-                      ? 'bg-stone-100/10 text-stone-50 shadow-lg backdrop-blur-sm border border-stone-100/20'
-                      : 'text-stone-200 hover:bg-stone-100/5 hover:text-stone-50 hover:translate-x-1'
-                  }`}
-                >
-                  <div className={`p-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-amber-400/20 text-amber-200'
-                      : 'bg-teal-600/30 text-stone-300 group-hover:bg-teal-500/40 group-hover:text-stone-200'
-                  }`}>
-                    <IconComponent className="h-5 w-5" />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-semibold">{item.label}</span>
-                    <span className={`text-xs ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
-                      {item.description}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Quick Actions */}
-          <div className="space-y-3 p-4 border-t border-teal-600/30">
-            <div className="text-xs font-semibold text-stone-300 uppercase tracking-wider mb-3">
-              Quick Actions
-            </div>
-            <Button
-              onClick={reanalyzeAllFeedback}
-              variant="outline"
-              size="sm"
-              className="w-full justify-start gap-3 bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50"
-              title="Re-analyze all feedback with AI categorization"
-            >
-              <AIIcon className="h-4 w-4" />
-              <span>Re-analyze All</span>
-            </Button>
-            <Button
-              onClick={() => {
-                const csvData = feedback.map(f => ({
-                  content: f.content,
-                  category: f.category,
-                  aiConfidence: f.aiCategoryConfidence ? Math.round(f.aiCategoryConfidence * 100) + '%' : 'N/A',
-                  manualOverride: f.manualOverride ? 'Yes' : 'No',
-                  sentiment: f.sentimentLabel || f.sentiment_label,
-                  source: f.source,
-                  date: f.feedbackDate || f.feedback_date
-                }))
-                const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(
-                  'Content,Category,AI Confidence,Manual Override,Sentiment,Source,Date\n' +
-                  csvData.map(row => Object.values(row).map(val => `"${val}"`).join(',')).join('\n')
-                )
-                const link = document.createElement('a')
-                link.href = csv
-                link.download = 'feedback-category-report.csv'
-                link.click()
-              }}
-              variant="outline"
-              size="sm"
-              className="w-full justify-start gap-3 bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50"
-              title="Export category analysis report"
-            >
-              <DocumentArrowDownIcon className="h-4 w-4" />
-              <span>Export Report</span>
-            </Button>
-          </div>
-
-          {/* User Section */}
-          <div className="border-t border-teal-600/30 p-4 bg-teal-800/30">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-lg">
-                <UserIcon className="h-5 w-5" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold truncate text-stone-50">
-                  {user?.email || 'User'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span className="text-xs text-stone-300">Online</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.href = '/dashboard/profile'}
-                className="w-full justify-start gap-3 bg-transparent border-stone-300/30 text-stone-200 hover:bg-stone-100/10 hover:text-stone-50 hover:border-stone-200/50"
-              >
-                <UserIcon className="h-4 w-4" />
-                <span>View Profile</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSignOut}
-                className="w-full justify-start gap-3 bg-transparent border-red-400/30 text-red-200 hover:bg-red-500/20 hover:text-red-100 hover:border-red-300/50"
-              >
-                <ArrowRightOnRectangleIcon className="h-4 w-4" />
-                <span>Sign Out</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </aside>
+      {/* Sidebar Component */}
+      <Sidebar
+        user={user}
+        onSignOut={onSignOut}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        feedback={feedback}
+        reanalyzeAllFeedback={reanalyzeAllFeedback}
+      />
 
       {/* Main Content */}
-      <main className="ml-72 flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-30 shadow-sm">
+      <main
+        className="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          marginLeft: isDesktop ? getMainContentMargin() : '0px'
+        }}
+      >
+        {/* Mobile Header */}
+        <MobileHeader user={user} />
+
+        {/* Desktop Header */}
+        {isDesktop && (
+          <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-30 shadow-sm">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
               <div>
@@ -408,6 +250,7 @@ export default function Dashboard({ user, onSignOut }) {
             </div>
           </div>
         </header>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
@@ -465,5 +308,13 @@ export default function Dashboard({ user, onSignOut }) {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function Dashboard({ user, onSignOut }) {
+  return (
+    <SidebarProvider>
+      <DashboardContent user={user} onSignOut={onSignOut} />
+    </SidebarProvider>
   )
 }
