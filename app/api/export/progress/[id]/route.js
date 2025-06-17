@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/export/progress/[id] - Get export progress by export ID
 export async function GET(request, { params }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const { supabase } = createClient();
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {
@@ -70,7 +70,7 @@ export async function GET(request, { params }) {
 // PUT /api/export/progress/[id] - Update export progress by export ID
 export async function PUT(request, { params }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const { supabase } = createClient();
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {

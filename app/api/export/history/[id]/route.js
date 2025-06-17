@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/export/history/[id] - Get specific export details
 export async function GET(request, { params }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const { supabase } = createClient();
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {
@@ -59,7 +59,7 @@ export async function GET(request, { params }) {
 // PUT /api/export/history/[id] - Update export record
 export async function PUT(request, { params }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const { supabase } = createClient();
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {
@@ -169,7 +169,7 @@ export async function PUT(request, { params }) {
 // DELETE /api/export/history/[id] - Delete export record
 export async function DELETE(request, { params }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const { supabase } = createClient();
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {
