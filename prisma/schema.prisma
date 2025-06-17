@@ -8,18 +8,20 @@ datasource db {
 }
 
 model Profile {
-  id           String         @id @db.Uuid
-  email        String?
-  name         String?
-  phone        String?
-  preferences  Json?          @default("{}")
-  timezone     String?        @default("UTC")
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  activityLogs ActivityLog[]
-  categories   Category[]
-  feedback     Feedback[]
+  id            String          @id @db.Uuid
+  email         String?
+  name          String?
+  phone         String?
+  preferences   Json?           @default("{}")
+  timezone      String?         @default("UTC")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  activityLogs  ActivityLog[]
+  categories    Category[]
+  feedback      Feedback[]
   feedbackNotes FeedbackNote[]
+  exportHistory ExportHistory[]
+  exportTemplates ExportTemplate[]
 
   @@map("profiles")
 }
@@ -108,4 +110,69 @@ model ActivityLog {
   @@index([userId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+// Export-related models for enhanced export functionality
+
+model ExportHistory {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String         @map("user_id") @db.Uuid
+  exportType        String         @map("export_type") // csv, pdf, excel, json
+  configuration     Json           @default("{}")
+  filePath          String?        @map("file_path")
+  status            String         @default("pending") // pending, processing, completed, failed
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt       DateTime?      @map("completed_at") @db.Timestamptz(6)
+  fileSize          Int?           @map("file_size") // in bytes
+  recordCount       Int?           @map("record_count")
+  metadata          Json           @default("{}")
+  errorMessage      String?        @map("error_message")
+  retryCount        Int            @default(0) @map("retry_count")
+  
+  user              Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress          ExportProgress[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([exportType])
+  @@map("export_history")
+}
+
+model ExportTemplate {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String         @map("user_id") @db.Uuid
+  name            String
+  description     String?
+  configuration   Json           @default("{}")
+  isShared        Boolean        @default(false) @map("is_shared")
+  isDefault       Boolean        @default(false) @map("is_default")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  usageCount      Int            @default(0) @map("usage_count")
+  
+  user            Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isShared])
+  @@index([isDefault])
+  @@index([createdAt])
+  @@map("export_templates")
+}
+
+model ExportProgress {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exportId            String         @map("export_id") @db.Uuid
+  stage               String         // data_collection, processing, file_generation, completion
+  progressPercent     Int            @default(0) @map("progress_percent")
+  message             String?
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  estimatedCompletion DateTime?      @map("estimated_completion") @db.Timestamptz(6)
+  
+  export              ExportHistory  @relation(fields: [exportId], references: [id], onDelete: Cascade)
+
+  @@index([exportId])
+  @@index([stage])
+  @@index([updatedAt])
+  @@map("export_progress")
 }

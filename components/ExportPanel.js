@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { CSVExporter } from '@/lib/exporters/CSVExporter'
-import { PDFReportGenerator } from '@/lib/exporters/PDFReportGenerator'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,7 +30,7 @@ export default function ExportPanel({ feedback, analytics, filteredFeedback }) {
     includeCharts: true,
     includeFeedbackTable: true,
     includeInsights: true,
-    maxFeedbackEntries: 20,
+    maxFeedbackEntries: 100, // Increased from 20 to handle larger datasets
     
     // General options
     useFilteredData: true,
@@ -126,34 +125,71 @@ export default function ExportPanel({ feedback, analytics, filteredFeedback }) {
   }
 
   const handlePDFExport = async (fieldMapping = null) => {
-    const generator = new PDFReportGenerator()
-    
-    // Collect chart elements if needed
-    let chartElements = []
-    if (exportOptions.includeCharts) {
-      const chartContainers = document.querySelectorAll('[data-chart-export]')
-      chartElements = Array.from(chartContainers).map(element => ({
-        element,
-        title: element.getAttribute('data-chart-title') || 'Chart',
-        width: 160,
-        height: 100
-      }))
+    // CRITICAL: Log data counts for debugging pipeline issues
+    console.log('ExportPanel - Starting Puppeteer PDF export via API')
+    console.log(`ExportPanel - Original feedback count: ${feedback.length}`)
+    console.log(`ExportPanel - Filtered feedback count: ${filteredFeedback.length}`)
+    console.log(`ExportPanel - Data to export count: ${dataToExport.length}`)
+    console.log(`ExportPanel - Record count: ${recordCount}`)
+    console.log(`ExportPanel - Use filtered data: ${exportOptions.useFilteredData}`)
+
+    // Ensure we have the exact data count in subtitle
+    const actualCount = dataToExport.length
+    const subtitle = exportOptions.useFilteredData ?
+      `Filtered Results (${actualCount} entries selected from ${feedback.length} total)` :
+      `Complete Dataset (${actualCount} entries processed)`
+
+    console.log(`ExportPanel - Generating Puppeteer PDF with ${actualCount} entries`)
+
+    try {
+      // Call the API endpoint to generate PDF
+      const response = await fetch('/api/export/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feedback: dataToExport,
+          analytics: analytics,
+          options: {
+            title: 'Feedback Analytics Report',
+            subtitle: subtitle,
+            organizationName: 'FeedbackSense',
+            includeCharts: exportOptions.includeCharts,
+            includeFeedbackTable: exportOptions.includeFeedbackTable,
+            includeInsights: exportOptions.includeInsights,
+            includeAdvancedAnalytics: true,
+            includePredictiveInsights: true,
+            maxFeedbackEntries: exportOptions.maxFeedbackEntries,
+            filename: generateFilename('pdf'),
+            fieldMapping,
+            useFilteredData: exportOptions.useFilteredData
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'PDF generation failed')
+      }
+
+      console.log('ExportPanel - Puppeteer PDF generation completed, downloading...')
+      
+      // Download the PDF
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = generateFilename('pdf')
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+    } catch (error) {
+      console.error('Puppeteer PDF generation failed:', error)
+      throw error
     }
-
-    const report = await generator.generateReport(dataToExport, analytics, {
-      title: 'Feedback Analytics Report',
-      subtitle: exportOptions.useFilteredData ?
-        `Filtered Results (${recordCount} of ${feedback.length} entries)` :
-        `Complete Dataset (${recordCount} entries)`,
-      includeCharts: exportOptions.includeCharts,
-      includeFeedbackTable: exportOptions.includeFeedbackTable,
-      includeInsights: exportOptions.includeInsights,
-      maxFeedbackEntries: exportOptions.maxFeedbackEntries,
-      chartElements,
-      fieldMapping
-    })
-
-    generator.downloadPDF(generateFilename('pdf'))
   }
 
   const handleReExport = (savedConfiguration, savedExportType) => {

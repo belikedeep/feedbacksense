@@ -254,3 +254,176 @@ EXCEPTION
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create export_history table for tracking exports
+CREATE TABLE IF NOT EXISTS public.export_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  export_type TEXT NOT NULL,
+  configuration JSONB DEFAULT '{}',
+  file_path TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  file_size INTEGER,
+  record_count INTEGER,
+  metadata JSONB DEFAULT '{}',
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0
+);
+
+-- Create export_templates table for saving export configurations
+CREATE TABLE IF NOT EXISTS public.export_templates (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  configuration JSONB DEFAULT '{}',
+  is_shared BOOLEAN DEFAULT FALSE,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  usage_count INTEGER DEFAULT 0
+);
+
+-- Create export_progress table for real-time progress tracking
+CREATE TABLE IF NOT EXISTS public.export_progress (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  export_id UUID REFERENCES public.export_history(id) ON DELETE CASCADE NOT NULL,
+  stage TEXT NOT NULL,
+  progress_percent INTEGER DEFAULT 0,
+  message TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  estimated_completion TIMESTAMP WITH TIME ZONE
+);
+
+-- Enable Row Level Security for export tables
+ALTER TABLE public.export_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.export_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.export_progress ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing export policies if they exist
+DROP POLICY IF EXISTS "Users can view own export history" ON public.export_history;
+DROP POLICY IF EXISTS "Users can insert own export history" ON public.export_history;
+DROP POLICY IF EXISTS "Users can update own export history" ON public.export_history;
+DROP POLICY IF EXISTS "Users can delete own export history" ON public.export_history;
+DROP POLICY IF EXISTS "Users can view own export templates" ON public.export_templates;
+DROP POLICY IF EXISTS "Users can view shared export templates" ON public.export_templates;
+DROP POLICY IF EXISTS "Users can insert own export templates" ON public.export_templates;
+DROP POLICY IF EXISTS "Users can update own export templates" ON public.export_templates;
+DROP POLICY IF EXISTS "Users can delete own export templates" ON public.export_templates;
+DROP POLICY IF EXISTS "Users can view export progress for own exports" ON public.export_progress;
+DROP POLICY IF EXISTS "Users can insert export progress for own exports" ON public.export_progress;
+DROP POLICY IF EXISTS "Users can update export progress for own exports" ON public.export_progress;
+
+-- Create RLS policies for export_history
+CREATE POLICY "Users can view own export history" ON public.export_history
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own export history" ON public.export_history
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own export history" ON public.export_history
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own export history" ON public.export_history
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Create RLS policies for export_templates
+CREATE POLICY "Users can view own export templates" ON public.export_templates
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view shared export templates" ON public.export_templates
+  FOR SELECT USING (is_shared = true);
+
+CREATE POLICY "Users can insert own export templates" ON public.export_templates
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own export templates" ON public.export_templates
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own export templates" ON public.export_templates
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Create RLS policies for export_progress
+CREATE POLICY "Users can view export progress for own exports" ON public.export_progress
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.export_history
+      WHERE export_history.id = export_progress.export_id
+      AND export_history.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert export progress for own exports" ON public.export_progress
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.export_history
+      WHERE export_history.id = export_progress.export_id
+      AND export_history.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update export progress for own exports" ON public.export_progress
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.export_history
+      WHERE export_history.id = export_progress.export_id
+      AND export_history.user_id = auth.uid()
+    )
+  );
+
+-- Create indexes for export tables
+CREATE INDEX IF NOT EXISTS export_history_user_id_idx ON public.export_history(user_id);
+CREATE INDEX IF NOT EXISTS export_history_status_idx ON public.export_history(status);
+CREATE INDEX IF NOT EXISTS export_history_created_at_idx ON public.export_history(created_at);
+CREATE INDEX IF NOT EXISTS export_history_export_type_idx ON public.export_history(export_type);
+
+CREATE INDEX IF NOT EXISTS export_templates_user_id_idx ON public.export_templates(user_id);
+CREATE INDEX IF NOT EXISTS export_templates_is_shared_idx ON public.export_templates(is_shared);
+CREATE INDEX IF NOT EXISTS export_templates_is_default_idx ON public.export_templates(is_default);
+CREATE INDEX IF NOT EXISTS export_templates_created_at_idx ON public.export_templates(created_at);
+
+CREATE INDEX IF NOT EXISTS export_progress_export_id_idx ON public.export_progress(export_id);
+CREATE INDEX IF NOT EXISTS export_progress_stage_idx ON public.export_progress(stage);
+CREATE INDEX IF NOT EXISTS export_progress_updated_at_idx ON public.export_progress(updated_at);
+
+-- Add triggers for updated_at on export tables
+DROP TRIGGER IF EXISTS handle_export_templates_updated_at ON public.export_templates;
+CREATE TRIGGER handle_export_templates_updated_at
+  BEFORE UPDATE ON public.export_templates
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS handle_export_progress_updated_at ON public.export_progress;
+CREATE TRIGGER handle_export_progress_updated_at
+  BEFORE UPDATE ON public.export_progress
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Function to get export analytics for a user
+CREATE OR REPLACE FUNCTION public.get_export_analytics(user_uuid UUID)
+RETURNS TABLE (
+  total_exports BIGINT,
+  successful_exports BIGINT,
+  failed_exports BIGINT,
+  avg_file_size NUMERIC,
+  total_records_exported BIGINT,
+  most_used_export_type TEXT,
+  exports_this_month BIGINT,
+  exports_last_month BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    COUNT(*) as total_exports,
+    COUNT(*) FILTER (WHERE status = 'completed') as successful_exports,
+    COUNT(*) FILTER (WHERE status = 'failed') as failed_exports,
+    AVG(file_size)::NUMERIC as avg_file_size,
+    COALESCE(SUM(record_count), 0) as total_records_exported,
+    MODE() WITHIN GROUP (ORDER BY export_type) as most_used_export_type,
+    COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE)) as exports_this_month,
+    COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE - interval '1 month')
+                     AND created_at < date_trunc('month', CURRENT_DATE)) as exports_last_month
+  FROM public.export_history
+  WHERE user_id = user_uuid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

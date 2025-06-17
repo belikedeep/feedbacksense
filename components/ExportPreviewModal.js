@@ -405,9 +405,16 @@ export default function ExportPreviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        aria-describedby="export-preview-description"
+      >
         <DialogHeader>
           <DialogTitle>Export Preview - {exportType.toUpperCase()}</DialogTitle>
+          <div id="export-preview-description" className="sr-only">
+            Preview and configure your export settings before generating the {exportType.toUpperCase()} file.
+            Review data, customize field mappings, and validate export configuration.
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
