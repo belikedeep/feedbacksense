@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import ProjectHeader from '@/components/ProjectHeader'
-import { SidebarProvider } from '@/contexts/SidebarContext'
+import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import ProjectSidebar from '@/components/ProjectSidebar'
 import MobileHeader from '@/components/MobileHeader'
 import { Card, CardContent } from '@/components/ui/card'
@@ -89,7 +89,6 @@ function ProjectLayoutContent({ children, projectId }) {
 }
 
 function ProjectLayoutInner({ children, user, onSignOut }) {
-  const { useSidebar } = require('@/contexts/SidebarContext')
   const { isDesktop, getMainContentMargin } = useSidebar()
 
   return (

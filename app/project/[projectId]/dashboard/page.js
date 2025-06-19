@@ -5,6 +5,12 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { supabase } from '@/lib/supabase/client'
 import Dashboard from '@/components/Dashboard'
+import Analytics from '@/components/Analytics'
+import FeedbackFormComponent from '@/components/FeedbackForm'
+import CSVImportComponent from '@/components/CSVImport'
+import FeedbackListComponent from '@/components/FeedbackList'
+import CategoryAnalyticsComponent from '@/components/CategoryAnalytics'
+import AIPerformanceMetricsComponent from '@/components/AIPerformanceMetrics'
 import { Card, CardContent } from '@/components/ui/card'
 
 function DashboardContent() {
@@ -212,34 +218,28 @@ function DashboardContent() {
   )
 }
 
-// Import the components we need
+// Component wrappers using proper ES6 imports
 function ProjectDashboard({ feedback, project, onFeedbackUpdate }) {
-  const Analytics = require('@/components/Analytics').default
   return <Analytics feedback={feedback} />
 }
 
 function FeedbackForm({ onFeedbackAdded, projectId }) {
-  const FeedbackFormComponent = require('@/components/FeedbackForm').default
   return <FeedbackFormComponent onFeedbackAdded={onFeedbackAdded} projectId={projectId} />
 }
 
 function CSVImport({ onFeedbackImported, projectId }) {
-  const CSVImportComponent = require('@/components/CSVImport').default
   return <CSVImportComponent onFeedbackImported={onFeedbackImported} projectId={projectId} />
 }
 
 function FeedbackList({ feedback, onUpdate, currentProject }) {
-  const FeedbackListComponent = require('@/components/FeedbackList').default
   return <FeedbackListComponent feedback={feedback} onUpdate={onUpdate} currentProject={currentProject} />
 }
 
 function CategoryAnalytics({ feedback }) {
-  const CategoryAnalyticsComponent = require('@/components/CategoryAnalytics').default
   return <CategoryAnalyticsComponent feedback={feedback} />
 }
 
 function AIPerformanceMetrics({ feedback }) {
-  const AIPerformanceMetricsComponent = require('@/components/AIPerformanceMetrics').default
   return <AIPerformanceMetricsComponent feedback={feedback} />
 }
 
