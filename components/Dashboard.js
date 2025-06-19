@@ -11,6 +11,9 @@ import FeedbackList from './FeedbackList'
 import Analytics from './Analytics'
 import CategoryAnalytics from './CategoryAnalytics'
 import AIPerformanceMetrics from './AIPerformanceMetrics'
+import ProjectSelector from './ProjectSelector'
+import ProjectManager from './ProjectManager'
+import CreateProjectModal from './CreateProjectModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,13 +24,16 @@ import {
   DocumentArrowUpIcon,
   DocumentTextIcon,
   ChartBarIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  FolderOpenIcon
 } from '@heroicons/react/24/outline'
 
 function DashboardContent({ user, onSignOut }) {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currentProject, setCurrentProject] = useState(null)
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
   const { getMainContentMargin, isDesktop } = useSidebar()
 
   useEffect(() => {
@@ -43,6 +49,11 @@ function DashboardContent({ user, onSignOut }) {
     return () => {
       window.removeEventListener('switchTab', handleTabSwitch)
     }
+  }, [])
+
+  // Fetch current project on component mount
+  useEffect(() => {
+    fetchCurrentProject()
   }, [])
 
   const initializeUser = async () => {
@@ -64,6 +75,28 @@ function DashboardContent({ user, onSignOut }) {
     } catch (error) {
       console.error('Error initializing user:', error)
       setLoading(false)
+    }
+  }
+
+  const fetchCurrentProject = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const projects = await response.json()
+        // Find default project or first project
+        const defaultProject = projects.find(p => p.isDefault) || projects[0]
+        setCurrentProject(defaultProject || null)
+      }
+    } catch (error) {
+      console.error('Error fetching current project:', error)
     }
   }
 
@@ -133,6 +166,27 @@ function DashboardContent({ user, onSignOut }) {
     }
   }
 
+  const handleProjectChange = (newProject) => {
+    setCurrentProject(newProject)
+    // Refresh feedback when project changes
+    fetchFeedback()
+  }
+
+  const handleCreateProject = () => {
+    setShowCreateProjectModal(true)
+  }
+
+  const handleProjectCreated = (newProject) => {
+    setCurrentProject(newProject)
+    fetchCurrentProject() // Refresh project list
+    fetchFeedback() // Refresh feedback for new project
+  }
+
+  const handleProjectUpdate = () => {
+    fetchCurrentProject()
+    fetchFeedback()
+  }
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100 overflow-hidden">
       {/* Sidebar Component */}
@@ -143,6 +197,9 @@ function DashboardContent({ user, onSignOut }) {
         setActiveTab={setActiveTab}
         feedback={feedback}
         reanalyzeAllFeedback={reanalyzeAllFeedback}
+        currentProject={currentProject}
+        onProjectChange={handleProjectChange}
+        onCreateProject={handleCreateProject}
       />
 
       {/* Main Content */}
@@ -210,6 +267,14 @@ function DashboardContent({ user, onSignOut }) {
                       AI Performance
                     </>
                   )}
+                  {activeTab === 'projects' && (
+                    <>
+                      <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg">
+                        <FolderOpenIcon className="h-6 w-6 text-purple-700" />
+                      </div>
+                      Project Management
+                    </>
+                  )}
                 </h2>
                 <p className="text-gray-600 text-sm mt-1">
                   {activeTab === 'dashboard' && 'Comprehensive insights and performance metrics'}
@@ -218,6 +283,7 @@ function DashboardContent({ user, onSignOut }) {
                   {activeTab === 'feedback-list' && 'View and manage all feedback entries'}
                   {activeTab === 'category-analytics' && 'Deep dive into category performance'}
                   {activeTab === 'ai-performance' && 'Monitor AI categorization performance'}
+                  {activeTab === 'projects' && 'Manage your projects and organize feedback collection'}
                 </p>
               </div>
             </div>
@@ -255,6 +321,17 @@ function DashboardContent({ user, onSignOut }) {
         {/* Content Area */}
         <div className="flex-1 overflow-auto bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100">
           <div className="p-6">
+            {/* Project Selector - Show on all tabs except projects */}
+            {activeTab !== 'projects' && (
+              <div className="mb-6">
+                <ProjectSelector
+                  currentProject={currentProject}
+                  onProjectChange={handleProjectChange}
+                  onCreateProject={handleCreateProject}
+                />
+              </div>
+            )}
+
             {loading ? (
               <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                 <CardContent className="flex justify-center items-center h-64">
@@ -284,7 +361,11 @@ function DashboardContent({ user, onSignOut }) {
                 {activeTab === 'feedback-list' && (
                   <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
                     <CardContent className="p-6">
-                      <FeedbackList feedback={feedback} onUpdate={fetchFeedback} />
+                      <FeedbackList
+                        feedback={feedback}
+                        onUpdate={fetchFeedback}
+                        currentProject={currentProject}
+                      />
                     </CardContent>
                   </Card>
                 )}
@@ -302,11 +383,25 @@ function DashboardContent({ user, onSignOut }) {
                     </CardContent>
                   </Card>
                 )}
+                {activeTab === 'projects' && (
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
+                    <CardContent className="p-6">
+                      <ProjectManager onProjectUpdate={handleProjectUpdate} />
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </div>
         </div>
       </main>
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        onProjectCreated={handleProjectCreated}
+      />
     </div>
   )
 }

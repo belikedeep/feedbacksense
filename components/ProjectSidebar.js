@@ -1,5 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useProject } from '@/contexts/ProjectContext'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,102 +20,106 @@ import {
   ArrowRightOnRectangleIcon,
   DocumentArrowDownIcon,
   XMarkIcon,
-  Bars3Icon
+  Bars3Icon,
+  CogIcon,
+  BuildingOfficeIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline'
 
-export default function Sidebar({
-  user,
-  onSignOut,
-  activeTab,
-  setActiveTab,
-  feedback,
-  reanalyzeAllFeedback,
-  currentProject,
-  onProjectChange,
-  onCreateProject
-}) {
+export default function ProjectSidebar({ user, onSignOut }) {
+  const { project } = useProject()
+  const pathname = usePathname()
+  const router = useRouter()
   const { 
     isCollapsed, 
     isMobileOpen, 
-    breakpoint, 
     toggleCollapse, 
     closeMobileDrawer, 
     getSidebarWidth,
     isDesktop,
-    isMobileOrTablet,
-    showOverlay
+    isMobileOrTablet
   } = useSidebar()
 
-  const navigationItems = [
-    {
-      id: 'dashboard',
-      label: 'Analytics Dashboard',
-      icon: AnalyticsIcon,
-      description: 'Comprehensive insights'
-    },
-    {
-      id: 'add-feedback',
-      label: 'Add Feedback',
-      icon: PlusIcon,
-      description: 'Create new entry'
-    },
-    {
-      id: 'import-csv',
-      label: 'Import Data',
-      icon: DocumentArrowUpIcon,
-      description: 'Bulk import CSV'
-    },
-    {
-      id: 'feedback-list',
-      label: 'All Feedback',
-      icon: DocumentTextIcon,
-      description: 'View all entries'
-    },
-    {
-      id: 'category-analytics',
-      label: 'Category Insights',
-      icon: ChartBarIcon,
-      description: 'Deep category analysis'
-    },
-    {
-      id: 'ai-performance',
-      label: 'AI Performance',
-      icon: AIIcon,
-      description: 'AI metrics & accuracy'
-    },
-  ]
-
-  const handleSignOut = async () => {
-    if (onSignOut) {
-      onSignOut()
-    }
+  // Project-specific navigation items - keeping original structure
+  const getNavigationItems = () => {
+    if (!project) return []
+    
+    return [
+      {
+        id: 'dashboard',
+        label: 'Analytics Dashboard',
+        href: `/project/${project.id}/dashboard`,
+        icon: AnalyticsIcon,
+        description: 'Comprehensive insights'
+      },
+      {
+        id: 'add-feedback',
+        label: 'Add Feedback',
+        href: `/project/${project.id}/dashboard?tab=add-feedback`,
+        icon: PlusIcon,
+        description: 'Create new entry'
+      },
+      {
+        id: 'import-csv',
+        label: 'Import Data',
+        href: `/project/${project.id}/dashboard?tab=import-csv`,
+        icon: DocumentArrowUpIcon,
+        description: 'Bulk import CSV'
+      },
+      {
+        id: 'feedback-list',
+        label: 'All Feedback',
+        href: `/project/${project.id}/dashboard?tab=feedback-list`,
+        icon: DocumentTextIcon,
+        description: 'View all entries'
+      },
+      {
+        id: 'category-analytics',
+        label: 'Category Insights',
+        href: `/project/${project.id}/dashboard?tab=category-analytics`,
+        icon: ChartBarIcon,
+        description: 'Deep category analysis'
+      },
+      {
+        id: 'ai-performance',
+        label: 'AI Performance',
+        href: `/project/${project.id}/dashboard?tab=ai-performance`,
+        icon: AIIcon,
+        description: 'AI metrics & accuracy'
+      }
+    ]
   }
 
-  const handleNavItemClick = (itemId) => {
-    setActiveTab(itemId)
+  const navigationItems = getNavigationItems()
+
+  const handleNavItemClick = (href) => {
+    router.push(href)
     if (isMobileOrTablet) {
       closeMobileDrawer()
     }
   }
 
+  const reanalyzeAllFeedback = async () => {
+    if (!project) return
+    
+    if (!confirm('This will re-analyze all feedback in this project with improved sentiment analysis. Continue?')) {
+      return
+    }
+
+    try {
+      // Implementation for project-specific reanalysis
+      console.log('Reanalyzing feedback for project:', project.id)
+      // TODO: Implement project-scoped reanalysis API call
+    } catch (error) {
+      console.error('Error reanalyzing feedback:', error)
+    }
+  }
+
   const exportReport = () => {
-    const csvData = feedback.map(f => ({
-      content: f.content,
-      category: f.category,
-      aiConfidence: f.aiCategoryConfidence ? Math.round(f.aiCategoryConfidence * 100) + '%' : 'N/A',
-      manualOverride: f.manualOverride ? 'Yes' : 'No',
-      sentiment: f.sentimentLabel || f.sentiment_label,
-      source: f.source,
-      date: f.feedbackDate || f.feedback_date
-    }))
-    const csv = 'data:text/csv;charset=utf-8,' + encodeURIComponent(
-      'Content,Category,AI Confidence,Manual Override,Sentiment,Source,Date\n' +
-      csvData.map(row => Object.values(row).map(val => `"${val}"`).join(',')).join('\n')
-    )
-    const link = document.createElement('a')
-    link.href = csv
-    link.download = 'feedback-category-report.csv'
-    link.click()
+    if (!project) return
+    
+    // TODO: Implement project-specific export
+    console.log('Exporting report for project:', project.id)
   }
 
   // Mobile/Tablet drawer
@@ -136,18 +144,16 @@ export default function Sidebar({
           <SidebarContent
             isCollapsed={false}
             navigationItems={navigationItems}
-            activeTab={activeTab}
-            handleNavItemClick={handleNavItemClick}
+            pathname={pathname}
+            onNavItemClick={handleNavItemClick}
             reanalyzeAllFeedback={reanalyzeAllFeedback}
             exportReport={exportReport}
             user={user}
-            handleSignOut={handleSignOut}
+            onSignOut={onSignOut}
             showCloseButton={true}
             closeMobileDrawer={closeMobileDrawer}
             toggleCollapse={toggleCollapse}
-            currentProject={currentProject}
-            onProjectChange={onProjectChange}
-            onCreateProject={onCreateProject}
+            project={project}
           />
         </aside>
       </>
@@ -163,18 +169,16 @@ export default function Sidebar({
       <SidebarContent
         isCollapsed={isCollapsed}
         navigationItems={navigationItems}
-        activeTab={activeTab}
-        handleNavItemClick={handleNavItemClick}
+        pathname={pathname}
+        onNavItemClick={handleNavItemClick}
         reanalyzeAllFeedback={reanalyzeAllFeedback}
         exportReport={exportReport}
         user={user}
-        handleSignOut={handleSignOut}
+        onSignOut={onSignOut}
         showCloseButton={false}
         closeMobileDrawer={closeMobileDrawer}
         toggleCollapse={toggleCollapse}
-        currentProject={currentProject}
-        onProjectChange={onProjectChange}
-        onCreateProject={onCreateProject}
+        project={project}
       />
     </aside>
   )
@@ -183,25 +187,89 @@ export default function Sidebar({
 function SidebarContent({
   isCollapsed,
   navigationItems,
-  activeTab,
-  handleNavItemClick,
+  pathname,
   reanalyzeAllFeedback,
   exportReport,
   user,
-  handleSignOut,
+  onSignOut,
   showCloseButton,
   closeMobileDrawer,
   toggleCollapse,
-  currentProject,
-  onProjectChange,
-  onCreateProject
+  project,
+  onNavItemClick
 }) {
+  const [currentTab, setCurrentTab] = useState(null)
+
+  // Update currentTab when pathname or window location changes
+  useEffect(() => {
+    const updateCurrentTab = () => {
+      if (typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search)
+        const tab = searchParams.get('tab')
+        setCurrentTab(tab)
+      }
+    }
+
+    updateCurrentTab()
+
+    // Listen for navigation events
+    const handleNavigation = () => {
+      setTimeout(updateCurrentTab, 100) // Small delay to ensure URL has updated
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('popstate', handleNavigation)
+      window.addEventListener('pushstate', handleNavigation)
+      window.addEventListener('replacestate', handleNavigation)
+      
+      // Custom event for manual navigation
+      window.addEventListener('urlchange', handleNavigation)
+      
+      return () => {
+        window.removeEventListener('popstate', handleNavigation)
+        window.removeEventListener('pushstate', handleNavigation)
+        window.removeEventListener('replacestate', handleNavigation)
+        window.removeEventListener('urlchange', handleNavigation)
+      }
+    }
+  }, [pathname])
+
+  // Handle navigation item clicks - use the passed function or create a local one
+  const handleNavClick = onNavItemClick || ((href) => {
+    if (typeof window !== 'undefined') {
+      window.location.href = href
+    }
+  })
+
+  const isActiveNavItem = (item) => {
+    if (item.id === 'dashboard') {
+      return pathname === item.href && !currentTab
+    }
+    
+    return currentTab === item.id
+  }
+
+  const getBusinessTypeIcon = (businessType) => {
+    const types = {
+      'e-commerce': '🛒',
+      'saas': '💻',
+      'healthcare': '🏥',
+      'education': '🎓',
+      'finance': '💰',
+      'real_estate': '🏠',
+      'food_beverage': '🍽️',
+      'retail': '🏪',
+      'consulting': '💼',
+      'manufacturing': '🏭',
+      'other': '🏢'
+    }
+    return types[businessType] || '🏢'
+  }
+
   return (
     <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className={`flex items-center border-b border-teal-600/30 px-6 py-6 relative ${
-        isCollapsed ? 'justify-center' : 'gap-3'
-      }`}>
+      {/* Logo and Project */}
+      <div className={`border-b border-teal-600/30 px-6 py-6 relative`}>
         {showCloseButton && (
           <button
             onClick={closeMobileDrawer}
@@ -212,23 +280,23 @@ function SidebarContent({
           </button>
         )}
         
-        <BrandLogo className="w-10 h-10 text-stone-100 flex-shrink-0" />
-        
-        {!isCollapsed && (
-          <div className="flex flex-col">
-            <h1 className="text-xl font-bold tracking-tight text-stone-50">FeedbackSense</h1>
-            <Badge className="w-fit text-xs bg-amber-500/20 text-amber-200 border-amber-400/30 hover:bg-amber-500/30">
-              v2.0 AI-Powered
-            </Badge>
-          </div>
-        )}
+        <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
+          <BrandLogo className="w-10 h-10 text-stone-100 flex-shrink-0" />
+          
+          {!isCollapsed && (
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-xl font-bold tracking-tight text-stone-50">FeedbackSense</h1>
+              <Badge className="w-fit text-xs bg-amber-500/20 text-amber-200 border-amber-400/30 hover:bg-amber-500/30">
+                v2.0 AI-Powered
+              </Badge>
+            </div>
+          )}
+        </div>
         
         {!showCloseButton && (
           <button
             onClick={toggleCollapse}
-            className={`p-2 text-stone-300 hover:text-stone-50 hover:bg-teal-600/30 rounded-lg transition-colors ${
-              isCollapsed ? 'ml-0' : 'ml-auto'
-            }`}
+            className={`absolute top-6 right-4 p-2 text-stone-300 hover:text-stone-50 hover:bg-teal-600/30 rounded-lg transition-colors`}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <Bars3Icon className="h-5 w-5" />
@@ -238,9 +306,14 @@ function SidebarContent({
 
       {/* Project Selector */}
       <ProjectSelectorSidebar
-        currentProject={currentProject}
-        onProjectChange={onProjectChange}
-        onCreateProject={onCreateProject}
+        currentProject={project}
+        onProjectChange={(newProject) => {
+          // Handle project change - could refresh or navigate
+          window.location.href = `/project/${newProject.id}/dashboard`
+        }}
+        onCreateProject={() => {
+          window.location.href = '/projects?create=true'
+        }}
         isCollapsed={isCollapsed}
       />
 
@@ -248,18 +321,24 @@ function SidebarContent({
       <nav className="space-y-2 p-4 flex-1 overflow-y-auto">
         {!isCollapsed && (
           <div className="text-xs font-semibold text-stone-300 uppercase tracking-wider mb-4">
-            Main Navigation
+            Project Navigation
           </div>
         )}
         
         {navigationItems.map((item) => {
           const IconComponent = item.icon
-          const isActive = activeTab === item.id
+          const isActive = isActiveNavItem(item)
           
           return (
             <button
               key={item.id}
-              onClick={() => handleNavItemClick(item.id)}
+              onClick={() => {
+                handleNavClick(item.href)
+                // Update tab state immediately for visual feedback
+                const url = new URL(item.href, window.location.origin)
+                const tab = url.searchParams.get('tab')
+                setCurrentTab(tab)
+              }}
               className={`flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 group ${
                 isCollapsed ? 'justify-center' : 'gap-3'
               } ${
@@ -288,6 +367,7 @@ function SidebarContent({
             </button>
           )
         })}
+
       </nav>
 
       {/* Quick Actions */}
@@ -303,10 +383,10 @@ function SidebarContent({
           variant="outline"
           size="sm"
           className={`w-full ${isCollapsed ? 'px-2' : 'justify-start gap-3'} bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50`}
-          title={isCollapsed ? "Re-analyze all feedback with AI categorization" : undefined}
+          title={isCollapsed ? "Re-analyze project feedback" : undefined}
         >
-          <AIIcon className="h-4 w-4 flex-shrink-0" />
-          {!isCollapsed && <span>Re-analyze All</span>}
+          <ArrowPathIcon className="h-4 w-4 flex-shrink-0" />
+          {!isCollapsed && <span>Re-analyze</span>}
         </Button>
         
         <Button
@@ -314,7 +394,7 @@ function SidebarContent({
           variant="outline"
           size="sm"
           className={`w-full ${isCollapsed ? 'px-2' : 'justify-start gap-3'} bg-teal-600/20 border-teal-500/30 text-stone-200 hover:bg-teal-500/30 hover:text-stone-50 hover:border-teal-400/50`}
-          title={isCollapsed ? "Export category analysis report" : undefined}
+          title={isCollapsed ? "Export project report" : undefined}
         >
           <DocumentArrowDownIcon className="h-4 w-4 flex-shrink-0" />
           {!isCollapsed && <span>Export Report</span>}
@@ -356,7 +436,7 @@ function SidebarContent({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSignOut}
+            onClick={onSignOut}
             className={`w-full ${isCollapsed ? 'px-2' : 'justify-start gap-3'} bg-transparent border-red-400/30 text-red-200 hover:bg-red-500/20 hover:text-red-100 hover:border-red-300/50`}
             title={isCollapsed ? "Sign Out" : undefined}
           >

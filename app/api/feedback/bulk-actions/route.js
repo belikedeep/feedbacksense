@@ -24,23 +24,30 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { 
-      action, 
-      feedbackIds, 
-      data: actionData, 
-      confirmPermanentDelete = false 
+    const {
+      action,
+      feedbackIds,
+      data: actionData,
+      confirmPermanentDelete = false,
+      projectId
     } = body
 
     if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {
       return NextResponse.json({ error: 'No feedback IDs provided' }, { status: 400 })
     }
 
-    // Validate that all feedback belongs to the user
+    // Validate that all feedback belongs to the user and optionally to the specified project
+    const whereClause = {
+      id: { in: feedbackIds },
+      userId: user.id
+    }
+    
+    if (projectId) {
+      whereClause.projectId = projectId
+    }
+    
     const userFeedback = await prisma.feedback.findMany({
-      where: {
-        id: { in: feedbackIds },
-        userId: user.id
-      },
+      where: whereClause,
       select: { id: true }
     })
 

@@ -27,11 +27,21 @@ export async function DELETE(request, { params }) {
     const { id } = await params
 
     // Delete feedback (only if it belongs to the user)
+    // Also verify project ownership if projectId is provided in query params
+    const url = new URL(request.url)
+    const projectId = url.searchParams.get('projectId')
+    
+    const whereClause = {
+      id: id,
+      userId: user.id
+    }
+    
+    if (projectId) {
+      whereClause.projectId = projectId
+    }
+    
     const deletedFeedback = await prisma.feedback.deleteMany({
-      where: {
-        id: id,
-        userId: user.id
-      }
+      where: whereClause
     })
 
     if (deletedFeedback.count === 0) {
@@ -74,6 +84,7 @@ export async function PUT(request, { params }) {
       status,
       priority,
       isArchived,
+      projectId,
       reanalyze = false, // Flag to trigger AI re-analysis
       bulkOperation = false // Flag for bulk operations
     } = body
@@ -90,6 +101,20 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Feedback not found or unauthorized' }, { status: 404 })
     }
 
+    // Handle project validation if projectId is being updated
+    if (projectId && projectId !== existingFeedback.projectId) {
+      const projectExists = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          userId: user.id
+        }
+      })
+      
+      if (!projectExists) {
+        return NextResponse.json({ error: 'Invalid project ID or unauthorized' }, { status: 400 })
+      }
+    }
+
     // Prepare update data
     const updateData = {
       content,
@@ -99,7 +124,8 @@ export async function PUT(request, { params }) {
       topics,
       feedbackDate: feedbackDate ? new Date(feedbackDate) : undefined,
       status,
-      priority
+      priority,
+      ...(projectId !== undefined && { projectId })
     }
 
     // Handle archiving
@@ -231,6 +257,15 @@ export async function PUT(request, { params }) {
       where: {
         id: id,
         userId: user.id
+      },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            isDefault: true
+          }
+        }
       }
     })
 

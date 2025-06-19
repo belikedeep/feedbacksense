@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { track } from '@vercel/analytics'
 
-export default function CSVImport({ onFeedbackImported }) {
+export default function CSVImport({ onFeedbackImported, projectId }) {
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -224,7 +224,8 @@ export default function CSVImport({ onFeedbackImported }) {
               setMessage(`Saving ${feedbacks.length} analyzed feedback entries to database...`)
               
               try {
-                const response = await fetch('/api/feedback/bulk', {
+                const apiUrl = projectId ? `/project/${projectId}/api/feedback/bulk` : '/api/feedback/bulk'
+                const response = await fetch(apiUrl, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

@@ -24,7 +24,7 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { feedbacks } = body
+    const { feedbacks, projectId } = body
 
     if (!Array.isArray(feedbacks) || feedbacks.length === 0) {
       return NextResponse.json({ error: 'Invalid feedback data' }, { status: 400 })
@@ -61,6 +61,36 @@ export async function POST(request) {
       }
     }
 
+    // Handle project assignment
+    let assignedProjectId = projectId
+    
+    if (projectId) {
+      // Verify the specified project belongs to the user
+      const projectExists = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          userId: user.id
+        }
+      })
+      
+      if (!projectExists) {
+        return NextResponse.json({ error: 'Invalid project ID or unauthorized' }, { status: 400 })
+      }
+    } else {
+      // If no project specified, assign to default project
+      const defaultProject = await prisma.project.findFirst({
+        where: {
+          userId: user.id,
+          isDefault: true
+        }
+      })
+      
+      if (defaultProject) {
+        assignedProjectId = defaultProject.id
+      }
+      // If no default project exists, leave projectId as null for backward compatibility
+    }
+
     // Validate and prepare feedback data for bulk insert with AI fields
     const feedbackData = feedbacks.map((feedback, index) => {
       // Validate required fields
@@ -85,6 +115,7 @@ export async function POST(request) {
 
       return {
         userId: user.id,
+        projectId: assignedProjectId,
         content: feedback.content.trim(),
         source: feedback.source || 'csv_import',
         category: feedback.category || 'general_inquiry',

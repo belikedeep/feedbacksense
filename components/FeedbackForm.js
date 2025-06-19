@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 
-export default function FeedbackForm({ onFeedbackAdded }) {
+export default function FeedbackForm({ onFeedbackAdded, projectId }) {
   const [content, setContent] = useState('')
   const [source, setSource] = useState('manual')
   const [category, setCategory] = useState('') // Empty by default to let AI categorize
@@ -36,7 +36,8 @@ export default function FeedbackForm({ onFeedbackAdded }) {
       if (!session) throw new Error('User not authenticated')
 
       // Insert feedback via API (AI analysis happens server-side)
-      const response = await fetch('/api/feedback', {
+      const apiUrl = projectId ? `/project/${projectId}/api/feedback` : '/api/feedback'
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

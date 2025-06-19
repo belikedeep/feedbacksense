@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-export default function FeedbackList({ feedback, onUpdate }) {
+export default function FeedbackList({ feedback, onUpdate, currentProject }) {
   const [filteredFeedback, setFilteredFeedback] = useState(feedback)
   const [currentFilters, setCurrentFilters] = useState({})
   const [editingCategory, setEditingCategory] = useState(null)
@@ -227,6 +227,11 @@ export default function FeedbackList({ feedback, onUpdate }) {
           <div>
             <p className="text-sm text-muted-foreground">
               Showing {filteredFeedback.length} of {feedback.length} feedback entries
+              {currentProject && (
+                <span className="ml-2 text-purple-600">
+                  • Project: {currentProject.name}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex gap-2">

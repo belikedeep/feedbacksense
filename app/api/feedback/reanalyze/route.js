@@ -48,7 +48,8 @@ export async function POST(request) {
       sources = [],
       dateFrom = null,
       dateTo = null,
-      batchSize = batchConfig.batchSize
+      batchSize = batchConfig.batchSize,
+      projectId = null
     } = body
 
     // Build where clause based on filters
@@ -68,6 +69,23 @@ export async function POST(request) {
       whereClause.feedbackDate = {}
       if (dateFrom) whereClause.feedbackDate.gte = new Date(dateFrom)
       if (dateTo) whereClause.feedbackDate.lte = new Date(dateTo)
+    }
+
+    if (projectId) {
+      whereClause.projectId = projectId
+    } else {
+      // If no specific project requested, filter by default project
+      const defaultProject = await prisma.project.findFirst({
+        where: {
+          userId: user.id,
+          isDefault: true
+        }
+      })
+      
+      if (defaultProject) {
+        whereClause.projectId = defaultProject.id
+      }
+      // If no default project, analyze all feedback (backward compatibility)
     }
 
     // Get filtered feedback for this user

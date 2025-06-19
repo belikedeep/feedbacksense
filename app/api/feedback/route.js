@@ -31,11 +31,44 @@ export async function GET(request) {
     
     while (retryCount < maxRetries) {
       try {
+        // Get URL search params to check for project filter
+        const url = new URL(request.url)
+        const projectId = url.searchParams.get('projectId')
+        
+        // Build where clause based on project filter
+        const whereClause = {
+          userId: user.id
+        }
+        
+        if (projectId) {
+          whereClause.projectId = projectId
+        } else {
+          // If no specific project requested, get feedback from default project or all projects
+          // Check user preferences or get default project
+          const defaultProject = await prisma.project.findFirst({
+            where: {
+              userId: user.id,
+              isDefault: true
+            }
+          })
+          
+          // If user has projects but no specific project requested, filter by default project
+          if (defaultProject) {
+            whereClause.projectId = defaultProject.id
+          }
+          // If no default project, show all feedback (backward compatibility)
+        }
+
         feedback = await prisma.feedback.findMany({
-          where: {
-            userId: user.id
-          },
+          where: whereClause,
           include: {
+            project: {
+              select: {
+                id: true,
+                name: true,
+                isDefault: true
+              }
+            },
             notes: {
               include: {
                 user: {
@@ -117,7 +150,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 })
     }
 
-    const { content, source, category, sentimentScore, sentimentLabel, topics, feedbackDate } = body
+    const { content, source, category, sentimentScore, sentimentLabel, topics, feedbackDate, projectId } = body
 
     // Validate required fields
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -184,6 +217,36 @@ export async function POST(request) {
       }
     }
 
+    // Handle project assignment
+    let assignedProjectId = projectId
+    
+    if (!assignedProjectId) {
+      // If no project specified, assign to default project
+      const defaultProject = await prisma.project.findFirst({
+        where: {
+          userId: user.id,
+          isDefault: true
+        }
+      })
+      
+      if (defaultProject) {
+        assignedProjectId = defaultProject.id
+      }
+      // If no default project exists, leave projectId as null for backward compatibility
+    } else {
+      // Verify the specified project belongs to the user
+      const projectExists = await prisma.project.findFirst({
+        where: {
+          id: assignedProjectId,
+          userId: user.id
+        }
+      })
+      
+      if (!projectExists) {
+        return NextResponse.json({ error: 'Invalid project ID or unauthorized' }, { status: 400 })
+      }
+    }
+
     // Create new feedback with retry logic
     let newFeedback
     retryCount = 0
@@ -191,6 +254,7 @@ export async function POST(request) {
     // Prepare feedback data with AI analysis results or fallback values
     const feedbackData = {
       userId: user.id,
+      projectId: assignedProjectId,
       content: content.trim(),
       source: source || 'manual',
       feedbackDate: feedbackDate ? new Date(feedbackDate) : new Date(),
@@ -227,7 +291,16 @@ export async function POST(request) {
     while (retryCount < maxRetries) {
       try {
         newFeedback = await prisma.feedback.create({
-          data: feedbackData
+          data: feedbackData,
+          include: {
+            project: {
+              select: {
+                id: true,
+                name: true,
+                isDefault: true
+              }
+            }
+          }
         })
         break
       } catch (dbError) {
