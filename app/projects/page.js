@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client' 
+import { supabase } from '@/lib/supabase/client'
 import CreateProjectModal from '@/components/CreateProjectModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
+import {
   PlusIcon,
   FolderOpenIcon,
   BuildingOfficeIcon,
@@ -130,7 +130,7 @@ function CreateProjectCard({ onClick }) {
   )
 }
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -368,5 +368,27 @@ export default function ProjectsPage() {
         onProjectCreated={handleProjectCreated}
       />
     </div>
+  )
+}
+
+// Loading fallback component
+function ProjectsLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-4 border-teal-600 mx-auto"></div>
+        <p className="mt-6 text-lg font-medium text-gray-800">Loading your projects...</p>
+        <p className="mt-2 text-sm text-gray-600">Setting up your workspace</p>
+      </div>
+    </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<ProjectsLoading />}>
+      <ProjectsPageContent />
+    </Suspense>
   )
 }
