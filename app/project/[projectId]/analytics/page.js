@@ -5,6 +5,7 @@ import { useProject } from '@/contexts/ProjectContext'
 import { supabase } from '@/lib/supabase/client'
 import CategoryAnalytics from '@/components/CategoryAnalytics'
 import AIPerformanceMetrics from '@/components/AIPerformanceMetrics'
+import TimeRangeSelector from '@/components/TimeRangeSelector'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -18,7 +19,8 @@ import AIIcon from '@/components/icons/AIIcon'
 
 export default function ProjectAnalyticsPage({ params }) {
   const { project, loading: projectLoading } = useProject()
-  const [feedback, setFeedback] = useState([])
+  const [allFeedback, setAllFeedback] = useState([])
+  const [filteredFeedback, setFilteredFeedback] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -48,7 +50,8 @@ export default function ProjectAnalyticsPage({ params }) {
       }
 
       const data = await response.json()
-      setFeedback(data || [])
+      setAllFeedback(data || [])
+      setFilteredFeedback(data || [])
     } catch (err) {
       console.error('Error fetching feedback:', err)
       setError(err.message)
@@ -97,7 +100,8 @@ export default function ProjectAnalyticsPage({ params }) {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="bg-white/80 backdrop-blur-sm rounded-lg border border-stone-200 p-6">
+        <div className="flex flex-col gap-4">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg border border-stone-200 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl">
@@ -123,11 +127,26 @@ export default function ProjectAnalyticsPage({ params }) {
               Refresh Data
             </Button>
           </div>
+          </div>
+          
+          {/* Time Range Selector */}
+          {allFeedback.length > 0 && (
+            <TimeRangeSelector
+              feedback={allFeedback}
+              onRangeChange={(start, end) => {
+                const filtered = allFeedback.filter(f => {
+                  const date = new Date(f.createdAt || f.created_at)
+                  return date >= start && date <= end
+                })
+                setFilteredFeedback(filtered)
+              }}
+            />
+          )}
         </div>
       </div>
 
       {/* Analytics Content */}
-      {feedback.length === 0 ? (
+      {allFeedback.length === 0 ? (
         <Card className="bg-white/80 backdrop-blur-sm shadow-lg border border-stone-200">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="text-6xl mb-4">📊</div>
@@ -164,8 +183,11 @@ export default function ProjectAnalyticsPage({ params }) {
                   <p className="text-gray-600 text-sm">
                     Analyze feedback distribution and trends across categories for this project
                   </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Showing analytics for {filteredFeedback.length} out of {allFeedback.length} total feedback items
+                  </p>
                 </div>
-                <CategoryAnalytics feedback={feedback} />
+                <CategoryAnalytics feedback={filteredFeedback} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -179,7 +201,7 @@ export default function ProjectAnalyticsPage({ params }) {
                     Monitor AI categorization accuracy and performance for this project
                   </p>
                 </div>
-                <AIPerformanceMetrics feedback={feedback} />
+                <AIPerformanceMetrics feedback={filteredFeedback} />
               </CardContent>
             </Card>
           </TabsContent>

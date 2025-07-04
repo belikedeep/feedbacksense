@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Badge } from '@/components/ui/badge'
 
-export default function TimeRangeSelector({ onRangeChange, initialRange }) {
+export default function TimeRangeSelector({ onRangeChange, initialRange, feedback }) {
   const [selectedRange, setSelectedRange] = useState(initialRange || 'last30days')
   const [customStartDate, setCustomStartDate] = useState(null)
   const [customEndDate, setCustomEndDate] = useState(null)
@@ -21,7 +21,8 @@ export default function TimeRangeSelector({ onRangeChange, initialRange }) {
     { id: 'last30days', label: '30d', fullLabel: 'Last 30 days' },
     { id: 'last3months', label: '3m', fullLabel: 'Last 3 months' },
     { id: 'last6months', label: '6m', fullLabel: 'Last 6 months' },
-    { id: 'last1year', label: '1y', fullLabel: 'Last year' }
+    { id: 'last1year', label: '1y', fullLabel: 'Last year' },
+    { id: 'allTime', label: 'All', fullLabel: 'All time' }
   ]
 
   const calculateDateRange = (rangeId) => {
@@ -43,6 +44,14 @@ export default function TimeRangeSelector({ onRangeChange, initialRange }) {
         break
       case 'last1year':
         start = startOfDay(subYears(end, 1))
+        break
+      case 'allTime':
+        // Find earliest feedback date from props or use 2 years ago as fallback
+        const feedbackDates = feedback?.map(f => new Date(f.createdAt || f.created_at))
+        const earliestDate = feedbackDates?.length > 0
+          ? startOfDay(Math.min(...feedbackDates))
+          : startOfDay(subYears(end, 2))
+        start = earliestDate
         break
       case 'custom':
         return { start: customStartDate, end: customEndDate }
