@@ -135,7 +135,7 @@ export default function LandingPage() {
       name: "Starter",
       price: "$19",
       period: "/month",
-      description: "Ideal for growing businesses with moderate feedback volume",
+      description: "Ideal for growing businesses with moderate feedbacks",
       features: [
         "Up to 1,000 feedback entries/month",
         "One integration (email, etc.)",
