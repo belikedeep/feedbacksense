@@ -23,10 +23,22 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
+            echo "Navigating to project directory..."
             cd /home/ubuntu/feedbacksense
+
+            echo "Pulling latest changes..."
             git pull origin main
-            export NVM_DIR=~/.nvm
-            source ~/.nvm/nvm.sh
+
+            echo "Setting up Node environment..."
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+            echo "Installing dependencies..."
             npm install
+
+            echo "Building application..."
             npm run build
-            pm2 restart all
+
+            echo "Restarting PM2..."
+            pm2 restart all || pm2 start npm --name "feedbacksense" -- start
