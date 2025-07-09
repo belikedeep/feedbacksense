@@ -13,17 +13,18 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H 13.232.19.114 >> ~/.ssh/known_hosts
+          ssh-keyscan -H 13.235.238.145 >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@13.232.19.114 '
+          ssh -o StrictHostKeyChecking=no ubuntu@13.235.238.145 '
             cd ~/feedbacksense &&
             git fetch origin main &&
             git reset --hard origin/main &&
-            export PATH=$PATH:/home/ubuntu/.nvm/versions/node/v18.*/bin &&
+            export NVM_DIR="$HOME/.nvm" &&
+            source ~/.nvm/nvm.sh &&
             npm install &&
             npm run build &&
             pm2 delete all || true &&
-            pm2 start npm --name "feedbacksense" -- start
+            pm2 start "npx next start -H 0.0.0.0 -p 3000" --name "feedbacksense"
           '
