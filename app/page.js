@@ -302,7 +302,7 @@ export default function LandingPage() {
               </div>
               <div className="flex items-center">
                 <CheckIconSolid className="h-4 w-4 text-amber-300 mr-1" />
-                Setup in 2 minutess
+                Setup in 2 minutessss
               </div>
             </div>
           </div>

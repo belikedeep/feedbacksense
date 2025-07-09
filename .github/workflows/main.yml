@@ -1,4 +1,4 @@
-name: CI/CD
+name: Production Deployment
 
 on:
   push:
@@ -6,7 +6,10 @@ on:
 
 jobs:
   deploy:
+    name: Deploy to Production
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -14,14 +17,6 @@ jobs:
           host: 13.235.238.145
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
           script: |
-            cd ~/feedbacksense
-            git fetch origin main
-            git reset --hard origin/main
-            export NVM_DIR="$HOME/.nvm"
-            source ~/.nvm/nvm.sh
-            npm install
-            npm run build
-            pm2 delete all || true
-            pm2 start "npx next start -H 0.0.0.0 -p 3000" --name "feedbacksense"
+            echo "🚀 Starting production deployment..."
+            # The authorized_keys file on EC2 will handle the deployment commands
