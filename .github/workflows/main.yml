@@ -27,6 +27,9 @@ jobs:
             echo "Navigating to project directory..."
             cd /home/ubuntu/feedbacksense
 
+            echo "Configuring Git..."
+            git config core.sshCommand "ssh -i ~/.ssh/github-deploy-key"
+
             echo "Pulling latest changes..."
             git pull origin main
 
@@ -40,5 +43,5 @@ jobs:
             echo "Building application..."
             npm run build
 
-            echo "Restarting PM2..."
-            pm2 restart all || pm2 start npm --name "feedbacksense" -- start
+            echo "Restarting application..."
+            pm2 list | grep "feedbacksense" > /dev/null && pm2 restart feedbacksense || pm2 start npm --name "feedbacksense" -- start
