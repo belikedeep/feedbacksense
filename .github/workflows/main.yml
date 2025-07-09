@@ -8,23 +8,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Configure SSH
+      - name: Install SSH key
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          cat >> ~/.ssh/config << END
-          Host ec2
-            HostName 13.232.19.114
-            User ubuntu
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-          END
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 13.232.19.114 >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         run: |
-          ssh ec2 '
-            cd /home/ubuntu/feedbacksense &&
+          ssh -o StrictHostKeyChecking=no ubuntu@13.232.19.114 '
+            cd ~/feedbacksense &&
             git fetch origin main &&
             git reset --hard origin/main &&
             export NVM_DIR="$HOME/.nvm" &&
