@@ -8,23 +8,25 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup SSH
+      - name: Configure SSH
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github-deploy-key
-          chmod 600 ~/.ssh/github-deploy-key
-          echo "Host *
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config << END
+          Host ec2
+            HostName 13.232.19.114
+            User ubuntu
+            IdentityFile ~/.ssh/deploy_key
             StrictHostKeyChecking no
-            IdentityFile ~/.ssh/github-deploy-key" > ~/.ssh/config
+          END
 
       - name: Deploy to EC2
         run: |
-          ssh ubuntu@13.232.19.114 '
+          ssh ec2 '
             cd /home/ubuntu/feedbacksense &&
-            git config core.sshCommand "ssh -i ~/.ssh/github-deploy-key" &&
-            git pull origin main &&
+            git fetch origin main &&
+            git reset --hard origin/main &&
             export NVM_DIR="$HOME/.nvm" &&
             source ~/.nvm/nvm.sh &&
             npm install &&
