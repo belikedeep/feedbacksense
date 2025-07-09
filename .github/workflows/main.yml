@@ -10,24 +10,24 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install SSH key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: unnecessary
-          if_key_exists: replace
-
-      - name: Adding Known Hosts
-        run: ssh-keyscan -H 13.232.19.114 >> ~/.ssh/known_hosts
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github-deploy-key
+          chmod 600 ~/.ssh/github-deploy-key
+          echo "Host *
+            StrictHostKeyChecking no
+            IdentityFile ~/.ssh/github-deploy-key" > ~/.ssh/config
 
       - name: Deploy to EC2
         run: |
           ssh ubuntu@13.232.19.114 '
             cd /home/ubuntu/feedbacksense &&
+            git config core.sshCommand "ssh -i ~/.ssh/github-deploy-key" &&
             git pull origin main &&
             export NVM_DIR="$HOME/.nvm" &&
             source ~/.nvm/nvm.sh &&
             npm install &&
             npm run build &&
-            pm2 restart all
+            pm2 restart feedbacksense || pm2 start npm --name "feedbacksense" -- start
           '
